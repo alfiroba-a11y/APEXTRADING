@@ -32,9 +32,22 @@
         ::-webkit-scrollbar-track { background: #06090e; }
         ::-webkit-scrollbar-thumb { background: #232d42; border-radius: 2px; }
         html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #06090e; color: #f1f5f9; }
+
+        /* Custom Theme Overrides */
+        body.theme-cyberpunk { background-color: #0d0221 !important; color: #00f6ff !important; }
+        body.theme-cyberpunk .bg-brand-panel { background-color: #19053a !important; border-color: #ff007f !important; }
+        body.theme-cyberpunk .bg-brand-dark { background-color: #0d0221 !important; }
+        body.theme-cyberpunk .bg-brand-card { background-color: #240a4c !important; }
+        body.theme-cyberpunk .border-brand-border { border-color: #ff007f/40 !important; }
+
+        body.theme-terminal { background-color: #000000 !important; color: #ff9900 !important; font-family: monospace !important; }
+        body.theme-terminal .bg-brand-panel { background-color: #0a0a0a !important; border-color: #332200 !important; }
+        body.theme-terminal .bg-brand-dark { background-color: #000000 !important; }
+        body.theme-terminal .bg-brand-card { background-color: #121212 !important; }
+        body.theme-terminal .border-brand-border { border-color: #443300 !important; }
     </style>
 </head>
-<body class="bg-brand-dark flex flex-col h-screen overflow-hidden select-none">
+<body class="bg-brand-dark flex flex-col h-screen overflow-hidden select-none transition-colors duration-300">
 
     <!-- Header / Navbar -->
     <header class="h-14 bg-brand-panel border-b border-brand-border flex items-center justify-between px-4 z-30">
@@ -61,6 +74,18 @@
         </div>
 
         <div class="flex items-center space-x-4">
+            <!-- Audio Toggle -->
+            <button onclick="toggleAudio()" id="audioBtn" class="p-2 bg-brand-card border border-brand-border rounded-lg text-slate-300 hover:text-white" title="Toggle Sound FX">
+                <i data-lucide="volume-2" class="w-4 h-4"></i>
+            </button>
+
+            <!-- Theme Switcher -->
+            <select id="themeSelect" onchange="changeTheme()" class="bg-brand-dark border border-brand-border rounded-lg px-2 py-1 text-xs font-bold font-mono text-white">
+                <option value="default">APEX DARK</option>
+                <option value="cyberpunk">CYBERPUNK</option>
+                <option value="terminal">BLOOMBERG</option>
+            </select>
+
             <div class="flex items-center space-x-6 font-mono border-r border-brand-border pr-4">
                 <div>
                     <div class="text-[9px] text-slate-400 uppercase">Balance</div>
@@ -119,11 +144,26 @@
             </div>
         </aside>
 
-        <!-- CENTER: Main Live Chart & Positions -->
-        <main class="flex-1 flex flex-col border-r border-brand-border min-w-0">
-            <div class="h-10 bg-brand-panel border-b border-brand-border flex items-center justify-between px-4 font-mono">
-                <span id="symbolDisplay" class="text-sm font-black">BTC/USDT</span>
+        <!-- CENTER: Main Live Chart & Indicator Area -->
+        <main class="flex-1 flex flex-col border-r border-brand-border min-w-0 relative">
+            <div class="h-10 bg-brand-panel border-b border-brand-border flex items-center justify-between px-4 font-mono z-10">
+                <div class="flex items-center space-x-4">
+                    <span id="symbolDisplay" class="text-sm font-black">BTC/USDT</span>
+                    <div class="flex items-center space-x-2 text-[11px]">
+                        <button onclick="toggleIndicator('ma')" id="btnMA" class="px-2 py-0.5 rounded bg-brand-card border border-brand-border text-slate-400">MA(20/50)</button>
+                        <button onclick="toggleIndicator('rsi')" id="btnRSI" class="px-2 py-0.5 rounded bg-brand-card border border-brand-border text-slate-400">RSI(14)</button>
+                    </div>
+                </div>
                 <span id="livePrice" class="text-sm font-bold text-emerald-400">Loading...</span>
+            </div>
+
+            <!-- Active Countdown Floating Overlay -->
+            <div id="countdownOverlay" class="hidden absolute top-14 left-4 z-20 bg-brand-panel/90 backdrop-blur border border-blue-500/50 rounded-xl p-3 shadow-2xl flex items-center space-x-3">
+                <div class="w-3 h-3 bg-blue-500 rounded-full animate-ping"></div>
+                <div>
+                    <div class="text-[9px] uppercase font-bold text-slate-400">Active Trade Timer</div>
+                    <div id="countdownTimer" class="font-mono text-lg font-black text-blue-400">00:10.0</div>
+                </div>
             </div>
 
             <div id="chartContainer" class="flex-1 w-full bg-brand-dark relative"></div>
@@ -139,6 +179,7 @@
                                     <th class="pb-1">Type</th>
                                     <th class="pb-1">Entry</th>
                                     <th class="pb-1">Stake</th>
+                                    <th class="pb-1">Time Left</th>
                                     <th class="pb-1">Realtime P&L</th>
                                 </tr>
                             </thead>
@@ -157,8 +198,21 @@
             </div>
         </main>
 
-        <!-- RIGHT: Orderbook & Execution -->
+        <!-- RIGHT: Orderbook, Execution & Order Flow Metrics -->
         <aside class="w-72 bg-brand-panel flex flex-col divide-y divide-brand-border">
+            <!-- Order Flow Metrics Header -->
+            <div class="p-2 bg-brand-dark/50 flex justify-between items-center font-mono text-[10px]">
+                <div>
+                    <span class="text-slate-400">CVD: </span>
+                    <span id="cvdMetric" class="font-bold text-emerald-400">+12.45</span>
+                </div>
+                <div>
+                    <span class="text-slate-400">Imbalance: </span>
+                    <span id="imbalanceMetric" class="font-bold text-blue-400">54% Buy</span>
+                </div>
+            </div>
+
+            <!-- Orderbook with Dynamic Depth Visuals -->
             <div class="h-60 p-3 flex flex-col font-mono text-xs overflow-hidden">
                 <div class="flex justify-between text-slate-400 text-[10px] uppercase font-bold mb-1">
                     <span>Price (USDT)</span>
@@ -183,8 +237,8 @@
                 </div>
 
                 <div class="grid grid-cols-2 gap-2 pt-1">
-                    <button onclick="executeOrder('HIGHER')" class="py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs tracking-wider shadow-lg">HIGHER ▲</button>
-                    <button onclick="executeOrder('LOWER')" class="py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-black text-xs tracking-wider shadow-lg">LOWER ▼</button>
+                    <button onclick="executeOrder('HIGHER')" class="py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs tracking-wider shadow-lg active:scale-95 transition-transform">HIGHER ▲</button>
+                    <button onclick="executeOrder('LOWER')" class="py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-black text-xs tracking-wider shadow-lg active:scale-95 transition-transform">LOWER ▼</button>
                 </div>
             </div>
         </aside>
@@ -240,10 +294,71 @@
         let activeSymbol = 'btcusdt';
         let currentPrice = 0;
         let activePositions = [];
+        let historicalCloses = [];
+
+        let audioEnabled = true;
+        let cvdAccumulator = 0;
 
         let klineWs = null;
         let depthWs = null;
 
+        // Audio Engine (Web Audio API - No external assets needed)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (!audioEnabled) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+            if (type === 'order') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, now); // D5
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.1); // A5
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            } else if (type === 'win') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+                osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.35);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            } else if (type === 'loss') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.linearRampToValueAtTime(150, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+        }
+
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            const btn = document.getElementById('audioBtn');
+            btn.innerHTML = audioEnabled ? `<i data-lucide="volume-2" class="w-4 h-4"></i>` : `<i data-lucide="volume-x" class="w-4 h-4 text-rose-400"></i>`;
+            lucide.createIcons();
+        }
+
+        function changeTheme() {
+            const theme = document.getElementById('themeSelect').value;
+            document.body.className = 'flex flex-col h-screen overflow-hidden select-none transition-colors duration-300 ';
+            if (theme === 'cyberpunk') document.body.classList.add('theme-cyberpunk');
+            else if (theme === 'terminal') document.body.classList.add('theme-terminal');
+            else document.body.classList.add('bg-brand-dark');
+        }
+
+        // Charts Initialization
         const container = document.getElementById('chartContainer');
         const chart = LightweightCharts.createChart(container, {
             layout: { backgroundColor: '#06090e', textColor: '#9ca3af' },
@@ -255,6 +370,46 @@
         const candleSeries = chart.addCandlestickSeries({
             upColor: '#10b981', downColor: '#f43f5e', borderVisible: false, wickUpColor: '#10b981', wickDownColor: '#f43f5e'
         });
+
+        // Technical Indicator Overlay Series
+        const ma20Series = chart.addLineSeries({ color: '#3b82f6', lineWidth: 1, visible: false });
+        const ma50Series = chart.addLineSeries({ color: '#f59e0b', lineWidth: 1, visible: false });
+
+        let showMA = false;
+        let showRSI = false;
+
+        function toggleIndicator(ind) {
+            if (ind === 'ma') {
+                showMA = !showMA;
+                ma20Series.applyOptions({ visible: showMA });
+                ma50Series.applyOptions({ visible: showMA });
+                document.getElementById('btnMA').className = `px-2 py-0.5 rounded border ${showMA ? 'bg-blue-600/20 border-blue-500 text-blue-400 font-bold' : 'bg-brand-card border-brand-border text-slate-400'}`;
+            }
+            calculateIndicators();
+        }
+
+        function calculateIndicators() {
+            if (historicalCloses.length < 50) return;
+
+            if (showMA) {
+                const ma20Data = [];
+                const ma50Data = [];
+                for (let i = 0; i < historicalCloses.length; i++) {
+                    if (i >= 19) {
+                        const slice = historicalCloses.slice(i - 19, i + 1);
+                        const avg = slice.reduce((a, b) => a + b.close, 0) / 20;
+                        ma20Data.push({ time: historicalCloses[i].time, value: avg });
+                    }
+                    if (i >= 49) {
+                        const slice = historicalCloses.slice(i - 49, i + 1);
+                        const avg = slice.reduce((a, b) => a + b.close, 0) / 50;
+                        ma50Data.push({ time: historicalCloses[i].time, value: avg });
+                    }
+                }
+                ma20Series.setData(ma20Data);
+                ma50Series.setData(ma50Data);
+            }
+        }
 
         const pnlContainer = document.getElementById('pnlChartContainer');
         const pnlChart = LightweightCharts.createChart(pnlContainer, {
@@ -279,15 +434,16 @@
             try {
                 const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol.toUpperCase()}&interval=1m&limit=100`);
                 const data = await res.json();
-                const historicalCandles = data.map(d => ({
+                historicalCloses = data.map(d => ({
                     time: Math.floor(d[0] / 1000),
                     open: parseFloat(d[1]),
                     high: parseFloat(d[2]),
                     low: parseFloat(d[3]),
                     close: parseFloat(d[4])
                 }));
-                candleSeries.setData(historicalCandles);
+                candleSeries.setData(historicalCloses);
                 chart.timeScale().fitContent();
+                calculateIndicators();
 
                 if (data.length > 0) {
                     currentPrice = parseFloat(data[data.length - 1][4]);
@@ -328,19 +484,44 @@
 
         function renderOrderBook(bids, asks) {
             if (!bids || !asks) return;
-            document.getElementById('asksContainer').innerHTML = asks.slice(0, 5).reverse().map(a => `
-                <div class="flex justify-between text-rose-400 text-[11px]">
-                    <span>${parseFloat(a[0]).toFixed(2)}</span>
-                    <span class="text-slate-400">${parseFloat(a[1]).toFixed(3)}</span>
-                </div>
-            `).join('');
 
-            document.getElementById('bidsContainer').innerHTML = bids.slice(0, 5).map(b => `
-                <div class="flex justify-between text-emerald-400 text-[11px]">
-                    <span>${parseFloat(b[0]).toFixed(2)}</span>
-                    <span class="text-slate-400">${parseFloat(b[1]).toFixed(3)}</span>
-                </div>
-            `).join('');
+            let totalBidVol = bids.reduce((acc, b) => acc + parseFloat(b[1]), 0);
+            let totalAskVol = asks.reduce((acc, a) => acc + parseFloat(a[1]), 0);
+            let totalVol = totalBidVol + totalAskVol;
+
+            // Order Flow Metrics Update
+            let buyRatio = totalVol ? Math.round((totalBidVol / totalVol) * 100) : 50;
+            cvdAccumulator += (totalBidVol - totalAskVol) * 0.01;
+            document.getElementById('cvdMetric').innerText = `${cvdAccumulator >= 0 ? '+' : ''}${cvdAccumulator.toFixed(2)}`;
+            document.getElementById('cvdMetric').className = `font-bold ${cvdAccumulator >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+            document.getElementById('imbalanceMetric').innerText = `${buyRatio}% Buy`;
+
+            // Depth Heatmap Rendering
+            const maxAskVol = Math.max(...asks.map(a => parseFloat(a[1])));
+            document.getElementById('asksContainer').innerHTML = asks.slice(0, 5).reverse().map(a => {
+                const vol = parseFloat(a[1]);
+                const depthPct = Math.min(100, (vol / maxAskVol) * 100);
+                return `
+                    <div class="relative flex justify-between text-rose-400 text-[11px] px-1 py-0.5">
+                        <div class="absolute right-0 top-0 bottom-0 bg-rose-500/15" style="width: ${depthPct}%"></div>
+                        <span class="z-10">${parseFloat(a[0]).toFixed(2)}</span>
+                        <span class="text-slate-400 z-10">${vol.toFixed(3)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            const maxBidVol = Math.max(...bids.map(b => parseFloat(b[1])));
+            document.getElementById('bidsContainer').innerHTML = bids.slice(0, 5).map(b => {
+                const vol = parseFloat(b[1]);
+                const depthPct = Math.min(100, (vol / maxBidVol) * 100);
+                return `
+                    <div class="relative flex justify-between text-emerald-400 text-[11px] px-1 py-0.5">
+                        <div class="absolute right-0 top-0 bottom-0 bg-emerald-500/15" style="width: ${depthPct}%"></div>
+                        <span class="z-10">${parseFloat(b[0]).toFixed(2)}</span>
+                        <span class="text-slate-400 z-10">${vol.toFixed(3)}</span>
+                    </div>
+                `;
+            }).join('');
         }
 
         function selectMarket(sym) {
@@ -516,6 +697,7 @@
 
         function executeOrder(direction) {
             const stake = parseFloat(document.getElementById('stakeInput').value);
+            const duration = parseInt(document.getElementById('durationInput').value) || 10;
             const mode = document.getElementById('accountTypeSelect').value;
 
             let currentBal = mode === 'real' ? (currentUser ? currentUser.real_balance : 0) : (currentUser ? currentUser.demo_balance : 10000);
@@ -525,21 +707,59 @@
             else if (currentUser) currentUser.demo_balance -= stake;
 
             updateBalanceDisplay();
+            playSound('order');
 
+            const now = Date.now();
             activePositions.push({
                 id: 'APX-' + Math.floor(1000 + Math.random() * 9000),
-                direction, entryPrice: currentPrice, stake, currentPrice
+                direction,
+                entryPrice: currentPrice,
+                stake,
+                currentPrice,
+                duration,
+                startTime: now,
+                expiryTime: now + (duration * 1000)
             });
+
+            document.getElementById('countdownOverlay').classList.remove('hidden');
             renderPositions();
         }
 
         function processPositions(currentTime) {
             let totalPnL = 0;
-            activePositions.forEach(pos => {
+            const now = Date.now();
+
+            activePositions = activePositions.filter(pos => {
                 pos.currentPrice = currentPrice;
                 const won = pos.direction === 'HIGHER' ? pos.currentPrice > pos.entryPrice : pos.currentPrice < pos.entryPrice;
-                totalPnL += won ? (pos.stake * 0.95) : -pos.stake;
+                const pnl = won ? (pos.stake * 0.95) : -pos.stake;
+
+                if (now >= pos.expiryTime) {
+                    // Position Settlement
+                    if (won) {
+                        playSound('win');
+                        const mode = document.getElementById('accountTypeSelect').value;
+                        const returnAmt = pos.stake + (pos.stake * 0.95);
+                        if (mode === 'real' && currentUser) currentUser.real_balance += returnAmt;
+                        else if (currentUser) currentUser.demo_balance += returnAmt;
+                        updateBalanceDisplay();
+                    } else {
+                        playSound('loss');
+                    }
+                    return false; // Remove position
+                }
+
+                totalPnL += pnl;
+                return true;
             });
+
+            if (activePositions.length === 0) {
+                document.getElementById('countdownOverlay').classList.add('hidden');
+            } else {
+                const earliestExpiry = Math.min(...activePositions.map(p => p.expiryTime));
+                const timeLeft = Math.max(0, (earliestExpiry - now) / 1000);
+                document.getElementById('countdownTimer').innerText = `00:${timeLeft.toFixed(1).padStart(4, '0')}`;
+            }
 
             const pnlEl = document.getElementById('floatingPnL');
             pnlEl.innerText = `${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)}`;
@@ -555,14 +775,18 @@
         function renderPositions() {
             const table = document.getElementById('positionsTable');
             table.innerHTML = '';
+            const now = Date.now();
+
             activePositions.forEach(pos => {
                 const won = pos.direction === 'HIGHER' ? pos.currentPrice > pos.entryPrice : pos.currentPrice < pos.entryPrice;
+                const secsLeft = Math.max(0, (pos.expiryTime - now) / 1000).toFixed(1);
                 table.innerHTML += `
                     <tr>
                         <td class="py-1 font-bold">${pos.id}</td>
                         <td class="${pos.direction === 'HIGHER' ? 'text-emerald-400' : 'text-rose-400'}">${pos.direction}</td>
                         <td>$${pos.entryPrice.toFixed(2)}</td>
                         <td>$${pos.stake.toFixed(2)}</td>
+                        <td class="text-blue-400 font-bold">${secsLeft}s</td>
                         <td class="${won ? 'text-emerald-400' : 'text-rose-400'}">${won ? '+$' + (pos.stake * 0.95).toFixed(2) : '-$' + pos.stake.toFixed(2)}</td>
                     </tr>
                 `;
@@ -571,6 +795,11 @@
 
         fetchProfile();
         loadSymbolData('btcusdt');
+
+        // High-precision position tick loop
+        setInterval(() => {
+            if (activePositions.length > 0) processPositions();
+        }, 100);
     </script>
 </body>
 </html>
