@@ -14,10 +14,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'apex_trading_secret_key_2026';
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-// SQLite Database Setup
-const db = new sqlite3.Database('./apextrading.db', (err) => {
+// Serve static files directly from the root directory where index.html lives
+app.use(express.static(__dirname));
+
+// SQLite Database Setup (writes to /tmp on Render for write access)
+const dbPath = process.env.RENDER ? '/tmp/apextrading.db' : './apextrading.db';
+const db = new sqlite3.Database(dbPath, (err) => {
     if (err) console.error('Database connection error:', err.message);
     else console.log('Apex Trading DB Connected.');
 });
@@ -163,10 +166,12 @@ app.post('/api/wallet/withdraw', authenticateToken, (req, res) => {
     });
 });
 
+// Direct route to index.html in the root folder
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-server.listen(PORT, () => {
-    console.log(`Apex Trading Server running on http://localhost:${PORT}`);
+// Bind to 0.0.0.0 for Render compatibility
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Apex Trading Server running on port ${PORT}`);
 });
