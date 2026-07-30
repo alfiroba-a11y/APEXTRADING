@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex Trading | Professional Suite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            dark: '#06090e',
+                            panel: '#0e131f',
+                            card: '#161d2f',
+                            border: '#232d42',
+                            accent: '#3b82f6',
+                            up: '#10b981',
+                            down: '#f43f5e'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #06090e; }
+        ::-webkit-scrollbar-thumb { background: #232d42; border-radius: 2px; }
+        html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #06090e; color: #f1f5f9; }
+    </style>
+</head>
+<body class="bg-brand-dark flex flex-col h-screen overflow-hidden select-none">
+
+    <!-- Header / Navbar -->
+    <header class="h-14 bg-brand-panel border-b border-brand-border flex items-center justify-between px-4 z-30">
+        <div class="flex items-center space-x-6">
+            <div class="flex items-center space-x-2">
+                <div class="bg-blue-600 p-2 rounded-xl text-white shadow-lg shadow-blue-500/30">
+                    <i data-lucide="trending-up" class="w-5 h-5"></i>
+                </div>
+                <span class="font-black text-lg tracking-wider">APEX<span class="text-blue-500">TRADING</span></span>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <select id="accountTypeSelect" onchange="toggleAccountMode()" class="bg-brand-dark border border-brand-border rounded-lg px-2 py-1 text-xs font-bold font-mono text-white">
+                    <option value="demo">DEMO ACCOUNT</option>
+                    <option value="real">REAL ACCOUNT</option>
+                </select>
+                <select id="assetSelect" onchange="switchSymbol()" class="bg-brand-dark border border-brand-border rounded-lg px-2 py-1 text-xs font-bold font-mono text-white">
+                    <option value="btcusdt">BTC / USDT</option>
+                    <option value="ethusdt">ETH / USDT</option>
+                    <option value="solusdt">SOL / USDT</option>
+                    <option value="bnbusdt">BNB / USDT</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-6 font-mono border-r border-brand-border pr-4">
+                <div>
+                    <div class="text-[9px] text-slate-400 uppercase">Balance</div>
+                    <div id="accountBalance" class="text-xs font-bold text-emerald-400">$10,000.00</div>
+                </div>
+                <div>
+                    <div class="text-[9px] text-slate-400 uppercase">Live P&L</div>
+                    <div id="floatingPnL" class="text-xs font-bold text-slate-400">$0.00</div>
+                </div>
+            </div>
+
+            <div id="guestActions" class="flex items-center space-x-2">
+                <button onclick="openModal('loginModal')" class="px-3 py-1.5 bg-brand-card hover:bg-brand-border text-xs font-bold rounded-lg border border-brand-border">Log In</button>
+                <button onclick="openModal('signupModal')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-xs font-bold rounded-lg text-white">Register</button>
+            </div>
+
+            <div id="userActions" class="hidden flex items-center space-x-2">
+                <button onclick="openModal('depositModal')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold rounded-lg text-white">Deposit</button>
+                <button onclick="openModal('withdrawModal')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-xs font-bold rounded-lg text-white">Withdraw</button>
+                <div class="relative">
+                    <button onclick="toggleUserDropdown()" class="p-2 bg-brand-card border border-brand-border rounded-lg">
+                        <i data-lucide="user" class="w-4 h-4"></i>
+                    </button>
+                    <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-brand-panel border border-brand-border rounded-xl shadow-2xl p-2 z-50">
+                        <div id="profileEmail" class="px-3 py-2 text-[11px] font-mono text-slate-400 border-b border-brand-border truncate">user@apextrading.com</div>
+                        <button onclick="deleteAccount()" class="w-full text-left px-3 py-2 text-xs text-rose-400 hover:bg-rose-500/10 rounded-lg">Delete Account</button>
+                        <button onclick="logout()" class="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-brand-card rounded-lg">Sign Out</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Binance-Style Interface -->
+    <div class="flex-1 flex overflow-hidden">
+        <!-- LEFT: Market Selection -->
+        <aside class="w-48 bg-brand-panel border-r border-brand-border flex flex-col p-2">
+            <div class="text-[10px] font-bold text-slate-400 uppercase mb-2 px-2">Markets</div>
+            <div class="space-y-1 font-mono text-xs">
+                <button onclick="selectMarket('btcusdt')" class="w-full flex justify-between p-2 rounded-lg hover:bg-brand-card text-slate-200">
+                    <span>BTC/USDT</span>
+                    <span class="text-emerald-400">Live</span>
+                </button>
+                <button onclick="selectMarket('ethusdt')" class="w-full flex justify-between p-2 rounded-lg hover:bg-brand-card text-slate-200">
+                    <span>ETH/USDT</span>
+                    <span class="text-emerald-400">Live</span>
+                </button>
+                <button onclick="selectMarket('solusdt')" class="w-full flex justify-between p-2 rounded-lg hover:bg-brand-card text-slate-200">
+                    <span>SOL/USDT</span>
+                    <span class="text-emerald-400">Live</span>
+                </button>
+                <button onclick="selectMarket('bnbusdt')" class="w-full flex justify-between p-2 rounded-lg hover:bg-brand-card text-slate-200">
+                    <span>BNB/USDT</span>
+                    <span class="text-emerald-400">Live</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- CENTER: Main Live Chart & Positions -->
+        <main class="flex-1 flex flex-col border-r border-brand-border min-w-0">
+            <div class="h-10 bg-brand-panel border-b border-brand-border flex items-center justify-between px-4 font-mono">
+                <span id="symbolDisplay" class="text-sm font-black">BTC/USDT</span>
+                <span id="livePrice" class="text-sm font-bold text-emerald-400">Loading...</span>
+            </div>
+
+            <div id="chartContainer" class="flex-1 w-full bg-brand-dark relative"></div>
+
+            <div class="h-44 bg-brand-panel border-t border-brand-border flex">
+                <div class="flex-1 border-r border-brand-border flex flex-col overflow-hidden">
+                    <div class="px-4 py-1.5 border-b border-brand-border text-[11px] font-bold text-slate-400 bg-brand-dark/40">Open Positions</div>
+                    <div class="flex-1 overflow-y-auto p-2">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead class="text-slate-500 uppercase text-[10px] border-b border-brand-border">
+                                <tr>
+                                    <th class="pb-1">ID</th>
+                                    <th class="pb-1">Type</th>
+                                    <th class="pb-1">Entry</th>
+                                    <th class="pb-1">Stake</th>
+                                    <th class="pb-1">Realtime P&L</th>
+                                </tr>
+                            </thead>
+                            <tbody id="positionsTable" class="divide-y divide-brand-border/40 text-slate-300"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="w-64 bg-brand-dark p-2 flex flex-col">
+                    <div class="flex justify-between text-[10px] font-bold text-slate-400 uppercase mb-1">
+                        <span>Performance</span>
+                        <span id="pnlCurveVal" class="text-emerald-400 font-mono">+$0.00</span>
+                    </div>
+                    <div id="pnlChartContainer" class="flex-1 relative"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- RIGHT: Orderbook & Execution -->
+        <aside class="w-72 bg-brand-panel flex flex-col divide-y divide-brand-border">
+            <div class="h-60 p-3 flex flex-col font-mono text-xs overflow-hidden">
+                <div class="flex justify-between text-slate-400 text-[10px] uppercase font-bold mb-1">
+                    <span>Price (USDT)</span>
+                    <span>Volume</span>
+                </div>
+                <div id="asksContainer" class="flex-1 flex flex-col justify-end space-y-0.5 overflow-hidden"></div>
+                <div class="py-1 my-1 border-y border-brand-border text-center font-bold text-white bg-brand-dark text-xs">
+                    <span id="orderBookCurrentPrice" class="text-emerald-400">$0.00</span>
+                </div>
+                <div id="bidsContainer" class="flex-1 flex flex-col space-y-0.5 overflow-hidden"></div>
+            </div>
+
+            <div class="p-4 space-y-4">
+                <div>
+                    <label class="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Duration (Secs)</label>
+                    <input type="number" id="durationInput" value="10" min="3" class="w-full bg-brand-dark border border-brand-border rounded-lg px-3 py-1.5 text-xs font-bold font-mono text-white">
+                </div>
+
+                <div>
+                    <label class="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Stake Amount ($)</label>
+                    <input type="number" id="stakeInput" value="10" min="1" class="w-full bg-brand-dark border border-brand-border rounded-lg px-3 py-1.5 text-xs font-bold font-mono text-white">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                    <button onclick="executeOrder('HIGHER')" class="py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs tracking-wider shadow-lg">HIGHER ▲</button>
+                    <button onclick="executeOrder('LOWER')" class="py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-black text-xs tracking-wider shadow-lg">LOWER ▼</button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Modals -->
+    <div id="modalOverlay" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div id="loginModal" class="hidden bg-brand-panel border border-brand-border w-full max-w-md rounded-2xl p-6">
+            <h3 class="text-lg font-bold mb-4">Apex Login</h3>
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <input type="email" id="loginEmail" placeholder="Email Address" required class="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-sm text-white">
+                <input type="password" id="loginPassword" placeholder="Password" required class="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-sm text-white">
+                <button type="submit" class="w-full py-3 bg-blue-600 font-bold rounded-xl text-sm">Log In</button>
+            </form>
+            <button onclick="closeModals()" class="mt-4 text-xs text-slate-400 w-full text-center">Cancel</button>
+        </div>
+
+        <div id="signupModal" class="hidden bg-brand-panel border border-brand-border w-full max-w-md rounded-2xl p-6">
+            <h3 class="text-lg font-bold mb-4">Create Apex Account</h3>
+            <form onsubmit="handleSignup(event)" class="space-y-4">
+                <input type="text" id="signupUsername" placeholder="Username" required class="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-sm text-white">
+                <input type="email" id="signupEmail" placeholder="Email Address" required class="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-sm text-white">
+                <input type="password" id="signupPassword" placeholder="Password" required class="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-sm text-white">
+                <button type="submit" class="w-full py-3 bg-blue-600 font-bold rounded-xl text-sm">Register Account</button>
+            </form>
+            <button onclick="closeModals()" class="mt-4 text-xs text-slate-400 w-full text-center">Cancel</button>
+        </div>
+
+        <div id="depositModal" class="hidden bg-brand-panel border border-brand-border w-full max-w-md rounded-2xl p-6">
+            <h3 class="text-lg font-bold mb-4 text-emerald-400">Deposit Funds</h3>
+            <form onsubmit="handleDeposit(event)" class="space-y-4">
+                <input type="number" id="depositAmount" placeholder="Amount ($)" min="1" step="any" required class="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-sm font-mono text-white">
+                <button type="submit" class="w-full py-3 bg-emerald-600 font-bold rounded-xl text-sm">Confirm Deposit</button>
+            </form>
+            <button onclick="closeModals()" class="mt-4 text-xs text-slate-400 w-full text-center">Cancel</button>
+        </div>
+
+        <div id="withdrawModal" class="hidden bg-brand-panel border border-brand-border w-full max-w-md rounded-2xl p-6">
+            <h3 class="text-lg font-bold mb-4 text-rose-400">Withdraw Funds</h3>
+            <form onsubmit="handleWithdraw(event)" class="space-y-4">
+                <input type="number" id="withdrawAmount" placeholder="Amount ($)" min="1" step="any" required class="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-sm font-mono text-white">
+                <button type="submit" class="w-full py-3 bg-rose-600 font-bold rounded-xl text-sm">Execute Withdrawal</button>
+            </form>
+            <button onclick="closeModals()" class="mt-4 text-xs text-slate-400 w-full text-center">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let currentUser = null;
+        let token = localStorage.getItem('apex_token');
+        let activeSymbol = 'btcusdt';
+        let currentPrice = 0;
+        let activePositions = [];
+
+        let klineWs = null;
+        let depthWs = null;
+
+        const container = document.getElementById('chartContainer');
+        const chart = LightweightCharts.createChart(container, {
+            layout: { backgroundColor: '#06090e', textColor: '#9ca3af' },
+            grid: { vertLines: { color: '#161d2f' }, horzLines: { color: '#161d2f' } },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+            priceScale: { borderColor: '#232d42' },
+            timeScale: { borderColor: '#232d42', timeVisible: true, secondsVisible: true }
+        });
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#10b981', downColor: '#f43f5e', borderVisible: false, wickUpColor: '#10b981', wickDownColor: '#f43f5e'
+        });
+
+        const pnlContainer = document.getElementById('pnlChartContainer');
+        const pnlChart = LightweightCharts.createChart(pnlContainer, {
+            layout: { backgroundColor: '#06090e', textColor: '#6b7280' },
+            grid: { vertLines: { visible: false }, horzLines: { color: '#161d2f' } },
+            priceScale: { borderColor: '#232d42' },
+            timeScale: { visible: false }
+        });
+        const pnlSeries = pnlChart.addLineSeries({ color: '#3b82f6', lineWidth: 2 });
+
+        function handleResize() {
+            chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
+            pnlChart.applyOptions({ width: pnlContainer.clientWidth, height: pnlContainer.clientHeight });
+        }
+        new ResizeObserver(handleResize).observe(container);
+        new ResizeObserver(handleResize).observe(pnlContainer);
+
+        async function loadSymbolData(symbol) {
+            if (klineWs) klineWs.close();
+            if (depthWs) depthWs.close();
+
+            try {
+                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol.toUpperCase()}&interval=1m&limit=100`);
+                const data = await res.json();
+                const historicalCandles = data.map(d => ({
+                    time: Math.floor(d[0] / 1000),
+                    open: parseFloat(d[1]),
+                    high: parseFloat(d[2]),
+                    low: parseFloat(d[3]),
+                    close: parseFloat(d[4])
+                }));
+                candleSeries.setData(historicalCandles);
+                chart.timeScale().fitContent();
+
+                if (data.length > 0) {
+                    currentPrice = parseFloat(data[data.length - 1][4]);
+                    document.getElementById('livePrice').innerText = currentPrice.toFixed(2);
+                    document.getElementById('orderBookCurrentPrice').innerText = `$${currentPrice.toFixed(2)}`;
+                }
+            } catch (err) {
+                console.error("Candle history fetch error:", err);
+            }
+
+            klineWs = new WebSocket(`wss://stream.binance.com:9443/ws/${symbol}@kline_1m`);
+            klineWs.onmessage = (e) => {
+                const msg = JSON.parse(e.data);
+                if (msg.e === 'kline') {
+                    const k = msg.k;
+                    currentPrice = parseFloat(k.c);
+                    document.getElementById('livePrice').innerText = currentPrice.toFixed(2);
+                    document.getElementById('orderBookCurrentPrice').innerText = `$${currentPrice.toFixed(2)}`;
+
+                    const liveCandle = {
+                        time: Math.floor(k.t / 1000),
+                        open: parseFloat(k.o),
+                        high: parseFloat(k.h),
+                        low: parseFloat(k.l),
+                        close: currentPrice
+                    };
+                    candleSeries.update(liveCandle);
+                    processPositions(liveCandle.time);
+                }
+            };
+
+            depthWs = new WebSocket(`wss://stream.binance.com:9443/ws/${symbol}@depth10@100ms`);
+            depthWs.onmessage = (e) => {
+                const msg = JSON.parse(e.data);
+                renderOrderBook(msg.bids, msg.asks);
+            };
+        }
+
+        function renderOrderBook(bids, asks) {
+            if (!bids || !asks) return;
+            document.getElementById('asksContainer').innerHTML = asks.slice(0, 5).reverse().map(a => `
+                <div class="flex justify-between text-rose-400 text-[11px]">
+                    <span>${parseFloat(a[0]).toFixed(2)}</span>
+                    <span class="text-slate-400">${parseFloat(a[1]).toFixed(3)}</span>
+                </div>
+            `).join('');
+
+            document.getElementById('bidsContainer').innerHTML = bids.slice(0, 5).map(b => `
+                <div class="flex justify-between text-emerald-400 text-[11px]">
+                    <span>${parseFloat(b[0]).toFixed(2)}</span>
+                    <span class="text-slate-400">${parseFloat(b[1]).toFixed(3)}</span>
+                </div>
+            `).join('');
+        }
+
+        function selectMarket(sym) {
+            document.getElementById('assetSelect').value = sym;
+            switchSymbol();
+        }
+
+        function switchSymbol() {
+            activeSymbol = document.getElementById('assetSelect').value;
+            document.getElementById('symbolDisplay').innerText = activeSymbol.toUpperCase();
+            loadSymbolData(activeSymbol);
+        }
+
+        async function fetchProfile() {
+            if (!token) return logoutUI();
+            try {
+                const res = await fetch('/api/user/profile', { headers: { Authorization: `Bearer ${token}` } });
+                const data = await res.json();
+                if (data.user) {
+                    currentUser = data.user;
+                    loginUI();
+                } else {
+                    logout();
+                }
+            } catch (e) {
+                logout();
+            }
+        }
+
+        function loginUI() {
+            document.getElementById('guestActions').classList.add('hidden');
+            document.getElementById('userActions').classList.remove('hidden');
+            document.getElementById('profileEmail').innerText = currentUser.email;
+            updateBalanceDisplay();
+        }
+
+        function logoutUI() {
+            currentUser = null;
+            token = null;
+            localStorage.removeItem('apex_token');
+            document.getElementById('guestActions').classList.remove('hidden');
+            document.getElementById('userActions').classList.add('hidden');
+            updateBalanceDisplay();
+        }
+
+        function logout() {
+            logoutUI();
+            closeModals();
+        }
+
+        function updateBalanceDisplay() {
+            const mode = document.getElementById('accountTypeSelect').value;
+            let bal = 10000.00;
+            if (mode === 'real') {
+                bal = currentUser ? currentUser.real_balance : 0.00;
+            } else {
+                bal = currentUser ? currentUser.demo_balance : 10000.00;
+            }
+            document.getElementById('accountBalance').innerText = `$${bal.toFixed(2)}`;
+        }
+
+        function toggleAccountMode() {
+            updateBalanceDisplay();
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (data.token) {
+                token = data.token;
+                localStorage.setItem('apex_token', token);
+                currentUser = data.user;
+                loginUI();
+                closeModals();
+            } else {
+                alert(data.error || 'Login failed');
+            }
+        }
+
+        async function handleSignup(e) {
+            e.preventDefault();
+            const username = document.getElementById('signupUsername').value;
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+
+            const res = await fetch('/api/auth/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password })
+            });
+            const data = await res.json();
+            if (data.token) {
+                token = data.token;
+                localStorage.setItem('apex_token', token);
+                currentUser = data.user;
+                loginUI();
+                closeModals();
+            } else {
+                alert(data.error || 'Registration failed');
+            }
+        }
+
+        async function handleDeposit(e) {
+            e.preventDefault();
+            const amount = document.getElementById('depositAmount').value;
+            const res = await fetch('/api/wallet/deposit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ amount })
+            });
+            const data = await res.json();
+            if (data.real_balance !== undefined) {
+                currentUser.real_balance = data.real_balance;
+                updateBalanceDisplay();
+                closeModals();
+            } else {
+                alert(data.error || 'Deposit failed');
+            }
+        }
+
+        async function handleWithdraw(e) {
+            e.preventDefault();
+            const amount = document.getElementById('withdrawAmount').value;
+            const res = await fetch('/api/wallet/withdraw', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ amount })
+            });
+            const data = await res.json();
+            if (data.real_balance !== undefined) {
+                currentUser.real_balance = data.real_balance;
+                updateBalanceDisplay();
+                closeModals();
+            } else {
+                alert(data.error || 'Withdrawal failed');
+            }
+        }
+
+        async function deleteAccount() {
+            if (!confirm('Are you sure you want to delete your Apex Trading account permanently?')) return;
+            const res = await fetch('/api/user/delete-account', {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            alert(data.message || 'Account deleted');
+            logout();
+        }
+
+        function openModal(id) {
+            document.getElementById('modalOverlay').classList.remove('hidden');
+            ['loginModal', 'signupModal', 'depositModal', 'withdrawModal'].forEach(m => {
+                document.getElementById(m).classList.add('hidden');
+            });
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModals() {
+            document.getElementById('modalOverlay').classList.add('hidden');
+        }
+
+        function toggleUserDropdown() {
+            document.getElementById('userDropdown').classList.toggle('hidden');
+        }
+
+        function executeOrder(direction) {
+            const stake = parseFloat(document.getElementById('stakeInput').value);
+            const mode = document.getElementById('accountTypeSelect').value;
+
+            let currentBal = mode === 'real' ? (currentUser ? currentUser.real_balance : 0) : (currentUser ? currentUser.demo_balance : 10000);
+            if (stake > currentBal) return alert('Insufficient balance');
+
+            if (mode === 'real') currentUser.real_balance -= stake;
+            else if (currentUser) currentUser.demo_balance -= stake;
+
+            updateBalanceDisplay();
+
+            activePositions.push({
+                id: 'APX-' + Math.floor(1000 + Math.random() * 9000),
+                direction, entryPrice: currentPrice, stake, currentPrice
+            });
+            renderPositions();
+        }
+
+        function processPositions(currentTime) {
+            let totalPnL = 0;
+            activePositions.forEach(pos => {
+                pos.currentPrice = currentPrice;
+                const won = pos.direction === 'HIGHER' ? pos.currentPrice > pos.entryPrice : pos.currentPrice < pos.entryPrice;
+                totalPnL += won ? (pos.stake * 0.95) : -pos.stake;
+            });
+
+            const pnlEl = document.getElementById('floatingPnL');
+            pnlEl.innerText = `${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)}`;
+            pnlEl.className = `text-xs font-bold ${totalPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+            document.getElementById('pnlCurveVal').innerText = `${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)}`;
+            document.getElementById('pnlCurveVal').className = `font-mono ${totalPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+            if (currentTime) pnlSeries.update({ time: currentTime, value: totalPnL });
+            renderPositions();
+        }
+
+        function renderPositions() {
+            const table = document.getElementById('positionsTable');
+            table.innerHTML = '';
+            activePositions.forEach(pos => {
+                const won = pos.direction === 'HIGHER' ? pos.currentPrice > pos.entryPrice : pos.currentPrice < pos.entryPrice;
+                table.innerHTML += `
+                    <tr>
+                        <td class="py-1 font-bold">${pos.id}</td>
+                        <td class="${pos.direction === 'HIGHER' ? 'text-emerald-400' : 'text-rose-400'}">${pos.direction}</td>
+                        <td>$${pos.entryPrice.toFixed(2)}</td>
+                        <td>$${pos.stake.toFixed(2)}</td>
+                        <td class="${won ? 'text-emerald-400' : 'text-rose-400'}">${won ? '+$' + (pos.stake * 0.95).toFixed(2) : '-$' + pos.stake.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        fetchProfile();
+        loadSymbolData('btcusdt');
+    </script>
+</body>
+</html>
