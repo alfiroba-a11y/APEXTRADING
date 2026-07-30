@@ -1,7 +1,7 @@
 {
   "name": "smarttrading-backend",
   "version": "1.0.0",
-  "description": "Smarttrading backend with admin suite",
+  "description": "Smarttrading Backend Engine with Admin Suite",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
