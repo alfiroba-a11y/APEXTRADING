@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const { Server } = require('socket.io');
@@ -11,11 +12,13 @@ const io = new Server(server, { cors: { origin: '*' } });
 // Middleware
 app.use(express.json());
 app.use(cors());
-app.use(express.static('public'));
 
-// Default Route to verify server works
+// Serve static assets from the /public folder
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Explicit Route for Main Dashboard
 app.get('/', (req, res) => {
-  res.send('Smarttrading Engine is Live');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Database Schemas
@@ -38,7 +41,7 @@ const systemConfigSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 const SystemConfig = mongoose.model('SystemConfig', systemConfigSchema);
 
-// Admin Authentication Middleware
+// Admin Middleware Protection
 const verifyAdminKey = (req, res, next) => {
   const adminKey = req.headers['x-admin-key'];
   if (adminKey === 'SECRET_ADMIN_KEY_123') {
@@ -91,7 +94,7 @@ app.post('/api/admin/global-config', verifyAdminKey, async (req, res) => {
   }
 });
 
-// Real-time Tick Stream via WebSocket
+// Real-time Synthetic Tick Stream via Socket.io
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
@@ -104,12 +107,17 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => clearInterval(tickInterval));
 });
 
-// Port & MongoDB Initialization
+// Fallback for SPA Routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Server Initialization
 const PORT = process.env.PORT || 10000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/smarttrading';
 
 mongoose.connect(MONGO_URI)
   .then(() => console.log('Connected to MongoDB successfully.'))
-  .catch((err) => console.log('MongoDB Warning: Database not connected. Run locally or provide MONGO_URI environment variable.'));
+  .catch(() => console.log('MongoDB Warning: Database connection offline. Config values will use defaults.'));
 
 server.listen(PORT, () => console.log(`Smarttrading Server running on port ${PORT}`));
