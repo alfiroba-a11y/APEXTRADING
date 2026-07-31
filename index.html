@@ -20,7 +20,7 @@
         .theme-emerald { background-color: #02120d !important; }
     </style>
 </head>
-<body class="bg-[#080c14] text-slate-200 flex flex-col h-screen overflow-hidden select-none transition-colors duration-300">
+<body id="appBody" class="bg-[#080c14] text-slate-200 flex flex-col h-screen overflow-hidden select-none transition-colors duration-300">
 
     <!-- Top Navigation Header -->
     <header class="h-14 border-b border-slate-800 bg-[#0d131f] flex items-center justify-between px-4 z-20">
@@ -125,16 +125,16 @@
                     <div class="text-[11px] font-mono text-slate-400">Last Digit: <span id="lastDigitDisplay" class="font-bold text-blue-400">0</span></div>
                 </div>
                 <div class="grid grid-cols-10 gap-1">
-                    <script>
-                        for(let i=0; i<=9; i++){
-                            document.write(`
-                                <div id="dstat-card-${i}" class="bg-slate-900 border border-slate-800 rounded p-1 text-center transition-all">
-                                    <div class="text-[10px] font-bold text-slate-500">${i}</div>
-                                    <div id="dstat-${i}" class="text-xs font-mono font-bold text-slate-200">10.0%</div>
-                                </div>
-                            `);
-                        }
-                    </script>
+                    <div id="dstat-card-0" class="bg-slate-900 border border-slate-800 rounded p-1 text-center transition-all"><div class="text-[10px] font-bold text-slate-500">0</div><div id="dstat-0" class="text-xs font-mono font-bold text-slate-200">10.0%</div></div>
+                    <div id="dstat-card-1" class="bg-slate-900 border border-slate-800 rounded p-1 text-center transition-all"><div class="text-[10px] font-bold text-slate-500">1</div><div id="dstat-1" class="text-xs font-mono font-bold text-slate-200">10.0%</div></div>
+                    <div id="dstat-card-2" class="bg-slate-900 border border-slate-800 rounded p-1 text-center transition-all"><div class="text-[10px] font-bold text-slate-500">2</div><div id="dstat-2" class="text-xs font-mono font-bold text-slate-200">10.0%</div></div>
+                    <div id="dstat-card-3" class="bg-slate-900 border border-slate-800 rounded p-1 text-center transition-all"><div class="text-[10px] font-bold text-slate-500">3</div><div id="dstat-3" class="text-xs font-mono font-bold text-slate-200">10.0%</div></div>
+                    <div id="dstat-card-4" class="bg-slate-900 border border-slate-800 rounded p-1 text-center transition-all"><div class="text-[10px] font-bold text-slate-500">4</div><div id="dstat-4" class="text-xs font-mono font-bold text-slate-200">10.0%</div></div>
+                    <div id="dstat-card-5" class="bg-slate-900 border border-slate-800 rounded p-1 text-center transition-all"><div class="text-[10px] font-bold text-slate-500">5</div><div id="dstat-5" class="text-xs font-mono font-bold text-slate-200">10.0%</div></div>
+                    <div id="dstat-card-6" class="bg-slate-900 border border-slate-800 rounded p-1 text-center transition-all"><div class="text-[10px] font-bold text-slate-500">6</div><div id="dstat-6" class="text-xs font-mono font-bold text-slate-200">10.0%</div></div>
+                    <div id="dstat-card-7" class="bg-slate-900 border border-slate-800 rounded p-1 text-center transition-all"><div class="text-[10px] font-bold text-slate-500">7</div><div id="dstat-7" class="text-xs font-mono font-bold text-slate-200">10.0%</div></div>
+                    <div id="dstat-card-8" class="bg-slate-900 border border-slate-800 rounded p-1 text-center transition-all"><div class="text-[10px] font-bold text-slate-500">8</div><div id="dstat-8" class="text-xs font-mono font-bold text-slate-200">10.0%</div></div>
+                    <div id="dstat-card-9" class="bg-slate-900 border border-slate-800 rounded p-1 text-center transition-all"><div class="text-[10px] font-bold text-slate-500">9</div><div id="dstat-9" class="text-xs font-mono font-bold text-slate-200">10.0%</div></div>
                 </div>
             </div>
 
@@ -376,11 +376,11 @@
         let isAdminAuthenticated = false;
 
         // Admin Overrides
-        let adminMarketBias = "neutral"; // 'neutral', 'bullish', 'bearish', 'volatile'
-        let adminWinRateOverride = "normal"; // 'normal', 'always_win', 'always_lose'
+        let adminMarketBias = "neutral";
+        let adminWinRateOverride = "normal";
 
         // Trade Tracking
-        let activeTab = "history"; // 'open' or 'history'
+        let activeTab = "history";
         let openTrades = [];
         let closedTrades = [
             { id: "#819959", direction: "HIGHER", entry: 9522.88, close: 9522.92, stake: 10.00, pnl: 9.50, status: "WIN" },
@@ -390,7 +390,7 @@
 
         let equityHistory = [0, 9.5, 19.0, 9.0];
 
-        // Shared Audio Context to comply with browser autoplay policies
+        // Shared Audio Context
         let audioCtx = null;
         function getAudioContext() {
             if (!audioCtx) {
@@ -402,7 +402,7 @@
             return audioCtx;
         }
 
-        // Synthesize audio feedback via Web Audio API
+        // Audio Feedback
         function playAudioFeedback(type) {
             try {
                 const ctx = getAudioContext();
@@ -533,12 +533,11 @@
             }
         }
 
-        // Helper to get active balance
+        // Helpers
         function getActiveBalance() {
             return accountType === 'real' ? accountBalance : demoBalance;
         }
 
-        // Helper to sync balance to DOM
         function syncBalanceDisplay() {
             const balEl = document.getElementById('accountBalance');
             if (balEl) {
@@ -564,9 +563,6 @@
                     : 'bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded font-black text-sm transition-colors';
             }
 
-            const obPriceEl = document.getElementById('obCurrentPrice');
-            if (obPriceEl) obPriceEl.innerText = `$${currentPrice.toFixed(2)}`;
-
             updateDigitStats(currentPrice);
 
             let lastCandle = chartData[chartData.length - 1];
@@ -575,7 +571,6 @@
             lastCandle.low = Math.min(lastCandle.low, currentPrice);
             candlestickSeries.update(lastCandle);
 
-            // Tick active positions
             tickOpenTrades();
         }, 1000);
 
@@ -649,7 +644,6 @@
                 return;
             }
 
-            // Deduct stake
             if (accountType === 'real') {
                 accountBalance -= stake;
             } else {
@@ -689,7 +683,6 @@
             for (let t of openTrades) {
                 t.ticksRemaining--;
                 if (t.ticksRemaining <= 0) {
-                    // Contract Expired - Evaluate Result
                     let isWin = false;
                     if (adminWinRateOverride === 'always_win') {
                         isWin = true;
@@ -702,7 +695,6 @@
 
                     const pnl = isWin ? t.stake * 0.95 : -t.stake;
                     
-                    // Return stake + payout if win
                     if (isWin) {
                         if (accountType === 'real') accountBalance += (t.stake + pnl);
                         else demoBalance += (t.stake + pnl);
@@ -725,7 +717,6 @@
                         status: isWin ? 'WIN' : 'LOSS'
                     });
 
-                    // Update Equity Curve
                     const currentEquity = equityHistory[equityHistory.length - 1] + pnl;
                     equityHistory.push(currentEquity);
                     renderEquityCurve();
@@ -831,7 +822,6 @@
             if (ttEl) ttEl.innerText = total;
         }
 
-        // Helper UI interactions
         function switchTableTab(tab) {
             activeTab = tab;
             const openBtn = document.getElementById('tabOpenBtn');
@@ -891,7 +881,10 @@
         }
 
         function changeTheme(theme) {
-            document.body.className = `bg-brand-dark flex flex-col h-screen overflow-hidden select-none transition-colors duration-300 ${theme !== 'default' ? 'theme-' + theme : ''}`;
+            const body = document.getElementById('appBody');
+            if (body) {
+                body.className = `bg-[#080c14] text-slate-200 flex flex-col h-screen overflow-hidden select-none transition-colors duration-300 ${theme !== 'default' ? 'theme-' + theme : ''}`;
+            }
         }
 
         function toggleSideMenu() {
@@ -957,7 +950,7 @@
             if (e.altKey && e.key === "ArrowDown") { e.preventDefault(); adjustStake(-5); }
         });
 
-        // Initialize displays on load
+        // Initializations
         syncBalanceDisplay();
         updateTableDisplay();
         renderEquityCurve();
