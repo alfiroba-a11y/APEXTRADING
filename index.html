@@ -54,10 +54,36 @@
 </head>
 <body class="bg-brand-dark flex flex-col h-screen overflow-hidden select-none transition-colors duration-300">
 
-    <!-- Toast Alerts -->
+    <!-- Toast Alerts Container -->
     <div id="toastContainer" class="fixed top-16 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-    <!-- Secret Admin Portal Triggered by 3-Clicking Timer or Hotkey -->
+    <!-- Admin Authentication Modal (Password Protected) -->
+    <div id="adminAuthModal" class="hidden fixed inset-0 bg-black/85 z-50 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-brand-panel border border-blue-500/40 w-full max-w-sm rounded-2xl p-6 shadow-2xl font-mono text-xs space-y-4">
+            <div class="flex justify-between items-center border-b border-brand-border pb-3">
+                <div class="flex items-center space-x-2 text-blue-400 font-bold text-sm">
+                    <i data-lucide="lock" class="w-5 h-5"></i>
+                    <span>ADMIN PORTAL LOGIN</span>
+                </div>
+                <button onclick="closeModal('adminAuthModal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            
+            <form onsubmit="handleAdminLogin(event)" class="space-y-3">
+                <div>
+                    <label class="text-slate-400 text-[10px] uppercase font-bold block mb-1">Username</label>
+                    <input type="text" id="adminUsernameInput" required class="w-full bg-brand-dark border border-brand-border rounded px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500" placeholder="Enter username">
+                </div>
+                <div>
+                    <label class="text-slate-400 text-[10px] uppercase font-bold block mb-1">Password</label>
+                    <input type="password" id="adminPasswordInput" required class="w-full bg-brand-dark border border-brand-border rounded px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500" placeholder="Enter password">
+                </div>
+                <div id="authErrorMsg" class="text-rose-500 text-[10px] hidden font-bold">Invalid username or password. Access denied.</div>
+                <button type="submit" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-colors">Authenticate</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Secret Admin Portal Modal (Accessible only after auth) -->
     <div id="adminPortalModal" class="hidden fixed inset-0 bg-black/80 z-50 backdrop-blur-md flex items-center justify-center p-4">
         <div class="bg-brand-panel border border-rose-500/50 w-full max-w-2xl rounded-2xl p-6 shadow-2xl font-mono text-xs space-y-4">
             <div class="flex justify-between items-center border-b border-rose-500/30 pb-3">
@@ -71,7 +97,7 @@
             <div class="grid grid-cols-2 gap-4">
                 <div class="bg-brand-card p-3 rounded-xl border border-brand-border space-y-2">
                     <span class="text-slate-400 font-bold block">Market Trend Bias</span>
-                    <select id="adminMarketBias" class="w-full bg-brand-dark border border-brand-border rounded p-2 text-white">
+                    <select id="adminMarketBias" onchange="updateAdminSettings()" class="w-full bg-brand-dark border border-brand-border rounded p-2 text-white">
                         <option value="neutral">Fair Market Dynamic</option>
                         <option value="bullish">Bullish Trend (+80%)</option>
                         <option value="bearish">Bearish Trend (+80%)</option>
@@ -79,15 +105,15 @@
                     </select>
                 </div>
                 <div class="bg-brand-card p-3 rounded-xl border border-brand-border space-y-2">
-                    <span class="text-slate-400 font-bold block">Balance Override</span>
+                    <span class="text-slate-400 font-bold block">Balance Override ($)</span>
                     <div class="flex space-x-2">
-                        <input type="number" id="adminBalanceInput" value="50000" class="w-full bg-brand-dark border border-brand-border rounded p-2 text-white">
+                        <input type="number" id="adminBalanceInput" value="109.00" class="w-full bg-brand-dark border border-brand-border rounded p-2 text-white">
                         <button onclick="setAdminBalance()" class="bg-blue-600 px-3 rounded font-bold text-white">Set</button>
                     </div>
                 </div>
                 <div class="bg-brand-card p-3 rounded-xl border border-brand-border space-y-2">
-                    <span class="text-slate-400 font-bold block">Outcome Control</span>
-                    <select id="adminWinRate" class="w-full bg-brand-dark border border-brand-border rounded p-2 text-white">
+                    <span class="text-slate-400 font-bold block">Outcome Override</span>
+                    <select id="adminWinRate" onchange="updateAdminSettings()" class="w-full bg-brand-dark border border-brand-border rounded p-2 text-white">
                         <option value="normal">Standard Engine Physics</option>
                         <option value="always_win">Force Always Win (100%)</option>
                         <option value="always_lose">Force Always Lose (0%)</option>
@@ -95,13 +121,13 @@
                 </div>
                 <div class="bg-brand-card p-3 rounded-xl border border-brand-border space-y-2">
                     <span class="text-slate-400 font-bold block">Simulated Latency</span>
-                    <input type="range" min="0" max="2000" value="50" step="50" id="adminLatency" class="w-full">
+                    <input type="range" min="0" max="2000" value="50" step="50" id="adminLatency" oninput="document.getElementById('latencyVal').innerText = this.value + ' ms'" class="w-full">
                     <div class="text-[10px] text-right text-slate-400" id="latencyVal">50 ms</div>
                 </div>
             </div>
 
             <div class="pt-2 border-t border-brand-border flex justify-between items-center text-slate-400 text-[10px]">
-                <span>Unlocked via Admin Secret Triple-Click Gesture</span>
+                <span class="text-emerald-400 font-bold">✓ Authenticated Session Active</span>
                 <button onclick="closeModal('adminPortalModal')" class="px-4 py-2 bg-rose-600 text-white font-bold rounded-lg hover:bg-rose-500">Close Admin</button>
             </div>
         </div>
@@ -146,15 +172,15 @@
             </div>
 
             <nav class="space-y-1 font-mono text-xs">
-                <button onclick="toggleSideMenu()" class="w-full flex items-center justify-between p-2.5 hover:bg-brand-card rounded-lg text-slate-300 hover:text-white">
+                <button onclick="promptDeposit(); toggleSideMenu();" class="w-full flex items-center justify-between p-2.5 hover:bg-brand-card rounded-lg text-slate-300 hover:text-white">
                     <div class="flex items-center space-x-3"><i data-lucide="arrow-down-circle" class="w-4 h-4 text-emerald-400"></i><span>Deposit</span></div>
                     <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-500"></i>
                 </button>
-                <button onclick="toggleSideMenu()" class="w-full flex items-center justify-between p-2.5 hover:bg-brand-card rounded-lg text-slate-300 hover:text-white">
+                <button onclick="promptWithdraw(); toggleSideMenu();" class="w-full flex items-center justify-between p-2.5 hover:bg-brand-card rounded-lg text-slate-300 hover:text-white">
                     <div class="flex items-center space-x-3"><i data-lucide="arrow-up-circle" class="w-4 h-4 text-rose-400"></i><span>Withdraw</span></div>
                     <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-500"></i>
                 </button>
-                <button onclick="toggleSideMenu()" class="w-full flex items-center space-x-3 p-2.5 hover:bg-brand-card rounded-lg text-slate-300">
+                <button onclick="toggleHotkeysModal(); toggleSideMenu();" class="w-full flex items-center space-x-3 p-2.5 hover:bg-brand-card rounded-lg text-slate-300">
                     <i data-lucide="keyboard" class="w-4 h-4"></i><span>Hotkeys</span>
                 </button>
             </nav>
@@ -167,7 +193,7 @@
         </div>
     </aside>
 
-    <!-- Header Bar matching screenshot -->
+    <!-- Header Bar -->
     <header class="h-14 bg-brand-panel border-b border-brand-border flex items-center justify-between px-3 z-30 font-mono text-xs">
         <div class="flex items-center space-x-3">
             <button onclick="toggleSideMenu()" class="p-1.5 hover:bg-brand-card rounded text-slate-400 hover:text-white">
@@ -182,19 +208,19 @@
                 <span class="font-black text-base tracking-wider text-white">SMART<span class="text-blue-500">TRADING</span></span>
             </div>
 
-            <!-- REAL ACCOUNT Dropdown -->
-            <select id="accountTypeSelect" class="bg-brand-dark border border-brand-border rounded-md px-2 py-1 text-xs font-bold text-white focus:outline-none">
+            <!-- REAL / DEMO ACCOUNT Dropdown -->
+            <select id="accountTypeSelect" onchange="switchAccountType(this.value)" class="bg-brand-dark border border-brand-border rounded-md px-2 py-1 text-xs font-bold text-white focus:outline-none cursor-pointer">
                 <option value="real">REAL ACCOUNT</option>
                 <option value="demo">DEMO ACCOUNT</option>
             </select>
 
             <!-- Timeframe Pills -->
             <div class="flex items-center bg-brand-dark border border-brand-border rounded-md p-0.5 text-xs font-bold">
-                <button onclick="setTimeframe('1m')" id="tf-1m" class="px-2 py-0.5 rounded bg-blue-600 text-white">1m</button>
-                <button onclick="setTimeframe('5m')" id="tf-5m" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">5m</button>
-                <button onclick="setTimeframe('15m')" id="tf-15m" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">15m</button>
-                <button onclick="setTimeframe('1h')" id="tf-1h" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">1h</button>
-                <button onclick="setTimeframe('4h')" id="tf-4h" class="px-2 py-0.5 rounded text-slate-400 hover:text-white">4h</button>
+                <button onclick="setTimeframe('1m')" id="tf-1m" class="tf-btn px-2 py-0.5 rounded bg-blue-600 text-white">1m</button>
+                <button onclick="setTimeframe('5m')" id="tf-5m" class="tf-btn px-2 py-0.5 rounded text-slate-400 hover:text-white">5m</button>
+                <button onclick="setTimeframe('15m')" id="tf-15m" class="tf-btn px-2 py-0.5 rounded text-slate-400 hover:text-white">15m</button>
+                <button onclick="setTimeframe('1h')" id="tf-1h" class="tf-btn px-2 py-0.5 rounded text-slate-400 hover:text-white">1h</button>
+                <button onclick="setTimeframe('4h')" id="tf-4h" class="tf-btn px-2 py-0.5 rounded text-slate-400 hover:text-white">4h</button>
             </div>
         </div>
 
@@ -206,7 +232,7 @@
             </div>
             <div>
                 <span class="text-[9px] text-slate-500 block">PROFIT FACTOR</span>
-                <span id="statProfitFactor" class="font-bold text-blue-400">0.00</span>
+                <span id="statProfitFactor" class="font-bold text-blue-400">1.90</span>
             </div>
             <div>
                 <span class="text-[9px] text-slate-500 block">TRADES COUNT</span>
@@ -216,7 +242,7 @@
 
         <!-- Account Balances and Actions -->
         <div class="flex items-center space-x-4">
-            <select id="themeSelect" onchange="changeTheme()" class="bg-brand-dark border border-brand-border rounded px-2 py-1 text-xs text-white">
+            <select id="themeSelect" onchange="changeTheme(this.value)" class="bg-brand-dark border border-brand-border rounded px-2 py-1 text-xs text-white">
                 <option value="default">SMART DARK</option>
                 <option value="cyberpunk">CYBERPUNK</option>
                 <option value="terminal">BLOOMBERG</option>
@@ -234,8 +260,8 @@
             </div>
 
             <div class="flex items-center space-x-2">
-                <button class="px-3 py-1 bg-brand-card border border-brand-border hover:bg-brand-border font-bold text-white rounded">Log In</button>
-                <button class="px-3 py-1 bg-blue-600 hover:bg-blue-500 font-bold text-white rounded">Register</button>
+                <button onclick="showToast('Logged in as trader@smarttrading.com', 'info')" class="px-3 py-1 bg-brand-card border border-brand-border hover:bg-brand-border font-bold text-white rounded">Log In</button>
+                <button onclick="promptDeposit()" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 font-bold text-white rounded">Deposit</button>
             </div>
         </div>
     </header>
@@ -246,77 +272,77 @@
         <!-- LEFT PANEL: WATCHLIST -->
         <aside class="w-52 bg-brand-panel border-r border-brand-border flex flex-col p-2 space-y-2">
             <div class="relative">
-                <input type="text" id="assetSearch" placeholder="Search Market..." class="w-full bg-brand-dark border border-brand-border rounded pl-7 pr-2 py-1 text-xs font-mono text-white focus:outline-none">
+                <input type="text" id="assetSearch" onkeyup="filterAssets(this.value)" placeholder="Search Market..." class="w-full bg-brand-dark border border-brand-border rounded pl-7 pr-2 py-1 text-xs font-mono text-white focus:outline-none">
                 <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2 top-1.5 text-slate-500"></i>
             </div>
 
             <div class="flex justify-between items-center text-[10px] font-bold text-slate-400 px-1 font-mono">
                 <span>WATCHLIST (20+)</span>
-                <span class="text-blue-500 cursor-pointer">ALL</span>
+                <span onclick="filterAssetCategory('all')" class="text-blue-500 cursor-pointer hover:underline">ALL</span>
             </div>
 
             <!-- Asset Items -->
-            <div class="flex-1 overflow-y-auto space-y-1 font-mono text-xs pr-1">
-                <div class="p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
+            <div id="assetListContainer" class="flex-1 overflow-y-auto space-y-1 font-mono text-xs pr-1">
+                <div onclick="selectAsset('Vol 50 (1s)', 680.12, 'SYNTHETIC')" class="asset-card p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
                     <div class="flex justify-between font-bold">
                         <span class="text-white">Vol 50 (1s)</span>
-                        <span class="text-slate-300">$680.12</span>
+                        <span class="asset-price text-slate-300">$680.12</span>
                     </div>
                     <div class="text-[9px] text-slate-500">SYNTHETIC</div>
                 </div>
 
-                <div class="p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
+                <div onclick="selectAsset('Vol 75 (1s)', 3410.85, 'SYNTHETIC')" class="asset-card p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
                     <div class="flex justify-between font-bold">
                         <span class="text-white">Vol 75 (1s)</span>
-                        <span class="text-slate-300">$3410.85</span>
+                        <span class="asset-price text-slate-300">$3410.85</span>
                     </div>
                     <div class="text-[9px] text-slate-500">SYNTHETIC</div>
                 </div>
 
-                <div class="p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
+                <div onclick="selectAsset('Vol 100 (1s)', 12540.90, 'SYNTHETIC')" class="asset-card p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
                     <div class="flex justify-between font-bold">
                         <span class="text-white">Vol 100 (1s)</span>
-                        <span class="text-slate-300">$12540.90</span>
+                        <span class="asset-price text-slate-300">$12540.90</span>
                     </div>
                     <div class="text-[9px] text-slate-500">SYNTHETIC</div>
                 </div>
 
-                <div class="p-2 bg-brand-card rounded border border-blue-500/60 cursor-pointer shadow-md">
+                <div onclick="selectAsset('BTC/USDT', 65048.26, 'CRYPTO')" class="asset-card p-2 bg-brand-card rounded border border-blue-500/60 cursor-pointer shadow-md">
                     <div class="flex justify-between font-bold">
                         <span class="text-white">BTC/USDT</span>
-                        <span class="text-emerald-400">$64200.00</span>
+                        <span class="asset-price text-emerald-400">$65048.26</span>
                     </div>
                     <div class="text-[9px] text-slate-500">CRYPTO</div>
                 </div>
 
-                <div class="p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
+                <div onclick="selectAsset('ETH/USDT', 3450.50, 'CRYPTO')" class="asset-card p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
                     <div class="flex justify-between font-bold">
                         <span class="text-white">ETH/USDT</span>
-                        <span class="text-slate-300">$3450.50</span>
+                        <span class="asset-price text-slate-300">$3450.50</span>
                     </div>
                     <div class="text-[9px] text-slate-500">CRYPTO</div>
                 </div>
 
-                <div class="p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
+                <div onclick="selectAsset('EUR/USD', 1.08500, 'FOREX')" class="asset-card p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
                     <div class="flex justify-between font-bold">
                         <span class="text-white">EUR/USD</span>
-                        <span class="text-slate-300">$1.08500</span>
+                        <span class="asset-price text-slate-300">$1.08500</span>
                     </div>
                     <div class="text-[9px] text-slate-500">FOREX</div>
                 </div>
 
-                <div class="p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
+                <div onclick="selectAsset('GBP/USD', 1.29200, 'FOREX')" class="asset-card p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
                     <div class="flex justify-between font-bold">
                         <span class="text-white">GBP/USD</span>
-                        <span class="text-slate-300">$1.29200</span>
+                        <span class="asset-price text-slate-300">$1.29200</span>
                     </div>
                     <div class="text-[9px] text-slate-500">FOREX</div>
                 </div>
 
-                <div class="p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
+                <div onclick="selectAsset('Gold (XAU/USD)', 2380.40, 'COMMODITY')" class="asset-card p-2 bg-brand-dark rounded border border-brand-border hover:border-blue-500/50 cursor-pointer">
                     <div class="flex justify-between font-bold">
                         <span class="text-white">Gold (XAU/USD)</span>
-                        <span class="text-slate-300">$2380.40</span>
+                        <span class="asset-price text-slate-300">$2380.40</span>
                     </div>
                     <div class="text-[9px] text-slate-500">COMMODITY</div>
                 </div>
@@ -325,10 +351,10 @@
 
         <!-- DRAWING TOOLS SLIM BAR -->
         <div class="w-10 bg-brand-panel border-r border-brand-border flex flex-col items-center py-2 space-y-3 text-slate-400">
-            <button class="p-1.5 hover:bg-brand-card rounded text-blue-400" title="Crosshair"><i data-lucide="crosshair" class="w-4 h-4"></i></button>
-            <button class="p-1.5 hover:bg-brand-card rounded hover:text-white" title="Price Line"><i data-lucide="minus" class="w-4 h-4"></i></button>
-            <button class="p-1.5 hover:bg-brand-card rounded hover:text-rose-400" title="Clear Canvas"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-            <button onclick="toggleHotkeysModal()" class="p-1.5 hover:bg-brand-card rounded hover:text-emerald-400" title="Hotkeys"><i data-lucide="keyboard" class="w-4 h-4"></i></button>
+            <button onclick="setChartTool('crosshair')" class="p-1.5 hover:bg-brand-card rounded text-blue-400 active:scale-95" title="Crosshair"><i data-lucide="crosshair" class="w-4 h-4"></i></button>
+            <button onclick="setChartTool('line')" class="p-1.5 hover:bg-brand-card rounded hover:text-white active:scale-95" title="Price Line"><i data-lucide="minus" class="w-4 h-4"></i></button>
+            <button onclick="clearChartDrawings()" class="p-1.5 hover:bg-brand-card rounded hover:text-rose-400 active:scale-95" title="Clear Canvas"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            <button onclick="toggleHotkeysModal()" class="p-1.5 hover:bg-brand-card rounded hover:text-emerald-400 active:scale-95" title="Hotkeys"><i data-lucide="keyboard" class="w-4 h-4"></i></button>
         </div>
 
         <!-- CENTER WORKSPACE: CHART & BOTTOM PANELS -->
@@ -337,22 +363,22 @@
             <!-- Top Controls Bar -->
             <div class="bg-brand-panel border-b border-brand-border px-3 py-1 flex items-center justify-between font-mono text-xs">
                 <div class="flex items-center space-x-2">
-                    <button class="px-3 py-1 rounded bg-blue-600 text-white font-bold">Rise / Fall</button>
-                    <button class="px-3 py-1 rounded bg-brand-card border border-brand-border text-slate-400 hover:text-white">Even / Odd</button>
+                    <button id="btnRiseFall" onclick="setContractMode('Rise/Fall')" class="px-3 py-1 rounded bg-blue-600 text-white font-bold transition-colors">Rise / Fall</button>
+                    <button id="btnEvenOdd" onclick="setContractMode('Even/Odd')" class="px-3 py-1 rounded bg-brand-card border border-brand-border text-slate-400 hover:text-white transition-colors">Even / Odd</button>
                 </div>
 
                 <div class="flex items-center space-x-3 text-[11px]">
-                    <span class="bg-blue-600/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded font-bold">CRYPTO</span>
+                    <span id="activeAssetCategory" class="bg-blue-600/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded font-bold">CRYPTO</span>
                 </div>
             </div>
 
             <!-- Sub Header Indicator Controls Bar -->
             <div class="h-9 bg-brand-panel border-b border-brand-border flex items-center justify-between px-3 font-mono text-xs">
                 <div class="flex items-center space-x-3">
-                    <span class="font-black text-white text-sm">BTC/USDT</span>
-                    <button class="px-2 py-0.5 bg-brand-card border border-brand-border text-slate-400 hover:text-white rounded text-[10px]">MA (20/50)</button>
-                    <button class="px-2 py-0.5 bg-brand-card border border-brand-border text-slate-400 hover:text-white rounded text-[10px]">RSI (14)</button>
-                    <button class="px-2 py-0.5 bg-brand-card border border-brand-border text-slate-400 hover:text-white rounded text-[10px]">BB (20,2)</button>
+                    <span id="activeAssetSymbol" class="font-black text-white text-sm">BTC/USDT</span>
+                    <button onclick="toggleIndicator('ma')" id="indMA" class="px-2 py-0.5 bg-brand-card border border-brand-border text-slate-400 hover:text-white rounded text-[10px]">MA (20/50)</button>
+                    <button onclick="toggleIndicator('rsi')" id="indRSI" class="px-2 py-0.5 bg-brand-card border border-brand-border text-slate-400 hover:text-white rounded text-[10px]">RSI (14)</button>
+                    <button onclick="toggleIndicator('bb')" id="indBB" class="px-2 py-0.5 bg-brand-card border border-brand-border text-slate-400 hover:text-white rounded text-[10px]">BB (20,2)</button>
                 </div>
 
                 <div class="flex items-center space-x-3 text-xs">
@@ -361,7 +387,7 @@
                         <div class="bg-emerald-500 h-full w-1/4"></div>
                     </div>
                     <span class="text-[10px] text-emerald-400 font-bold">LOW</span>
-                    <span id="livePrice" class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-black text-sm">65048.26</span>
+                    <span id="livePrice" class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-black text-sm transition-colors">65048.26</span>
                 </div>
             </div>
 
@@ -390,14 +416,14 @@
 
             <!-- BOTTOM PANEL: POSITIONS TABLE & EQUITY CURVE -->
             <div class="h-44 bg-brand-panel border-t border-brand-border flex font-mono text-xs">
-                <!-- Closed History Table Side -->
+                <!-- Positions / Closed History Table Side -->
                 <div class="w-7/12 border-r border-brand-border flex flex-col">
                     <div class="px-3 py-1 border-b border-brand-border flex justify-between items-center bg-brand-dark/40 text-[11px]">
                         <div class="flex space-x-4">
-                            <button class="text-slate-400 hover:text-white">Open Positions</button>
-                            <button class="text-blue-400 font-bold border-b-2 border-blue-400 pb-0.5">Closed History</button>
+                            <button id="tabOpenBtn" onclick="switchTableTab('open')" class="text-slate-400 hover:text-white">Open Positions (<span id="openCount">0</span>)</button>
+                            <button id="tabHistoryBtn" onclick="switchTableTab('history')" class="text-blue-400 font-bold border-b-2 border-blue-400 pb-0.5">Closed History</button>
                         </div>
-                        <button class="text-[10px] bg-brand-card border border-brand-border px-2 py-0.5 rounded text-slate-300 hover:text-white flex items-center space-x-1">
+                        <button onclick="exportHistoryCSV()" class="text-[10px] bg-brand-card border border-brand-border px-2 py-0.5 rounded text-slate-300 hover:text-white flex items-center space-x-1">
                             <i data-lucide="download" class="w-3 h-3"></i>
                             <span>Export CSV</span>
                         </button>
@@ -415,31 +441,8 @@
                                     <th class="pb-1">RESULT P&L</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-brand-border/40 text-slate-300 text-[11px]">
-                                <tr>
-                                    <td class="py-1">#819959</td>
-                                    <td class="text-emerald-400 font-bold">HIGHER</td>
-                                    <td>$9522.88</td>
-                                    <td>$9522.92</td>
-                                    <td>$10.00</td>
-                                    <td class="text-emerald-400 font-bold">+$9.50</td>
-                                </tr>
-                                <tr>
-                                    <td class="py-1">#976855</td>
-                                    <td class="text-rose-400 font-bold">LOWER</td>
-                                    <td>$9526.17</td>
-                                    <td>$9518.41</td>
-                                    <td>$10.00</td>
-                                    <td class="text-emerald-400 font-bold">+$9.50</td>
-                                </tr>
-                                <tr>
-                                    <td class="py-1">#420561</td>
-                                    <td class="text-emerald-400 font-bold">HIGHER</td>
-                                    <td>$9525.58</td>
-                                    <td>$9518.99</td>
-                                    <td>$10.00</td>
-                                    <td class="text-rose-400 font-bold">-$10.00</td>
-                                </tr>
+                            <tbody id="tradesTableBody" class="divide-y divide-brand-border/40 text-slate-300 text-[11px]">
+                                <!-- Populated dynamically by JavaScript -->
                             </tbody>
                         </table>
                     </div>
@@ -449,11 +452,11 @@
                 <div class="w-5/12 flex flex-col p-2 bg-brand-dark/30">
                     <div class="flex justify-between items-center text-[10px] font-bold text-slate-400 mb-1">
                         <span>P&L EQUITY CURVE</span>
-                        <span class="text-emerald-400 font-mono">+$0.00</span>
+                        <span id="cumulativePnLDisplay" class="text-emerald-400 font-mono">+$9.00</span>
                     </div>
                     <div class="flex-1 bg-brand-card border border-brand-border rounded flex items-center justify-center relative overflow-hidden">
-                        <svg class="w-full h-full p-2" viewBox="0 0 100 40">
-                            <path d="M 0,35 Q 25,30 50,20 T 100,5" fill="none" stroke="#10b981" stroke-width="2"/>
+                        <svg id="equitySvg" class="w-full h-full p-2" viewBox="0 0 100 40" preserveAspectRatio="none">
+                            <path id="equityPath" d="M 0,35 Q 25,30 50,20 T 100,5" fill="none" stroke="#10b981" stroke-width="2"/>
                         </svg>
                     </div>
                 </div>
@@ -466,13 +469,13 @@
             <!-- Orderbook Section -->
             <div class="p-2 space-y-1">
                 <div class="flex justify-between text-[10px] text-slate-400 font-bold">
-                    <span>CVD: <span class="text-emerald-400">+7.03</span></span>
-                    <span>Ratio: <span class="text-blue-400">71% Buy</span></span>
+                    <span>CVD: <span id="cvdVal" class="text-emerald-400">+7.03</span></span>
+                    <span>Ratio: <span id="buyRatioVal" class="text-blue-400">71% Buy</span></span>
                 </div>
 
                 <!-- CVD Bar Visualization -->
                 <div class="w-full h-1.5 bg-rose-500 rounded-full overflow-hidden flex">
-                    <div class="bg-emerald-500 h-full" style="width: 71%;"></div>
+                    <div id="cvdBar" class="bg-emerald-500 h-full transition-all duration-300" style="width: 71%;"></div>
                 </div>
 
                 <div class="flex justify-between text-[10px] text-slate-400 border-b border-brand-border pb-1 pt-1 font-bold">
@@ -481,12 +484,12 @@
                 </div>
 
                 <!-- Orderbook Table -->
-                <div class="space-y-0.5 text-[11px]">
+                <div id="orderbookList" class="space-y-0.5 text-[11px]">
                     <div class="flex justify-between"><span class="text-rose-400">65048.71</span><span class="text-slate-400">1.65</span></div>
                     <div class="flex justify-between"><span class="text-rose-400">65048.56</span><span class="text-slate-400">0.33</span></div>
                     <div class="flex justify-between"><span class="text-rose-400">65048.41</span><span class="text-slate-400">0.54</span></div>
                     
-                    <div class="py-0.5 bg-brand-dark border-y border-brand-border text-center font-bold text-emerald-400">
+                    <div id="obCurrentPrice" class="py-0.5 bg-brand-dark border-y border-brand-border text-center font-bold text-emerald-400">
                         $65048.26
                     </div>
 
@@ -501,34 +504,34 @@
                 <div>
                     <!-- Mode Selector Pills -->
                     <div class="grid grid-cols-2 gap-1 mb-2">
-                        <button class="py-1 bg-blue-600 text-white font-bold rounded text-center">AUTO</button>
-                        <button class="py-1 bg-brand-card border border-brand-border text-slate-400 hover:text-white rounded text-center">MANUAL</button>
+                        <button id="btnAutoMode" onclick="setExecMode('auto')" class="py-1 bg-blue-600 text-white font-bold rounded text-center transition-colors">AUTO</button>
+                        <button id="btnManualMode" onclick="setExecMode('manual')" class="py-1 bg-brand-card border border-brand-border text-slate-400 hover:text-white rounded text-center transition-colors">MANUAL</button>
                     </div>
                     <div class="grid grid-cols-2 gap-1 mb-3">
-                        <button class="py-1 bg-blue-600 text-white font-bold rounded text-center">MARKET</button>
-                        <button class="py-1 bg-brand-card border border-brand-border text-slate-400 hover:text-white rounded text-center">LIMIT</button>
+                        <button id="btnMarketOrder" onclick="setOrderType('market')" class="py-1 bg-blue-600 text-white font-bold rounded text-center transition-colors">MARKET</button>
+                        <button id="btnLimitOrder" onclick="setOrderType('limit')" class="py-1 bg-brand-card border border-brand-border text-slate-400 hover:text-white rounded text-center transition-colors">LIMIT</button>
                     </div>
 
                     <!-- Stake Amount -->
                     <label class="text-[9px] text-slate-400 uppercase font-bold block mb-1">STAKE AMOUNT ($)</label>
                     <div class="flex items-center space-x-2">
-                        <button onclick="adjustStake(-5)" class="px-3 py-1 bg-brand-card border border-brand-border rounded font-bold text-white text-base">-</button>
-                        <input type="number" id="stakeInput" value="10" class="w-full bg-brand-dark border border-brand-border rounded px-3 py-1.5 text-center text-sm font-bold text-white focus:outline-none">
-                        <button onclick="adjustStake(5)" class="px-3 py-1 bg-brand-card border border-brand-border rounded font-bold text-white text-base">+</button>
+                        <button onclick="adjustStake(-5)" class="px-3 py-1 bg-brand-card border border-brand-border rounded font-bold text-white text-base hover:bg-brand-border active:scale-95">-</button>
+                        <input type="number" id="stakeInput" value="10" min="1" class="w-full bg-brand-dark border border-brand-border rounded px-3 py-1.5 text-center text-sm font-bold text-white focus:outline-none focus:border-blue-500">
+                        <button onclick="adjustStake(5)" class="px-3 py-1 bg-brand-card border border-brand-border rounded font-bold text-white text-base hover:bg-brand-border active:scale-95">+</button>
                     </div>
 
                     <!-- Stake Quick Presets -->
                     <div class="grid grid-cols-4 gap-1 mt-1.5">
-                        <button onclick="setPresetStake(10)" class="py-0.5 bg-brand-card border border-brand-border rounded text-[10px] text-slate-300 hover:text-white">$10</button>
-                        <button onclick="setPresetStake(50)" class="py-0.5 bg-brand-card border border-brand-border rounded text-[10px] text-slate-300 hover:text-white">$50</button>
-                        <button onclick="setPresetStake(100)" class="py-0.5 bg-brand-card border border-brand-border rounded text-[10px] text-slate-300 hover:text-white">$100</button>
-                        <button onclick="setPresetStake(500)" class="py-0.5 bg-brand-card border border-brand-border rounded text-[10px] text-slate-300 hover:text-white">$500</button>
+                        <button onclick="setPresetStake(10)" class="py-0.5 bg-brand-card border border-brand-border rounded text-[10px] text-slate-300 hover:text-white active:scale-95">$10</button>
+                        <button onclick="setPresetStake(50)" class="py-0.5 bg-brand-card border border-brand-border rounded text-[10px] text-slate-300 hover:text-white active:scale-95">$50</button>
+                        <button onclick="setPresetStake(100)" class="py-0.5 bg-brand-card border border-brand-border rounded text-[10px] text-slate-300 hover:text-white active:scale-95">$100</button>
+                        <button onclick="setPresetStake(500)" class="py-0.5 bg-brand-card border border-brand-border rounded text-[10px] text-slate-300 hover:text-white active:scale-95">$500</button>
                     </div>
 
                     <!-- Duration Ticks Select -->
                     <div class="mt-3">
                         <label class="text-[9px] text-slate-400 uppercase font-bold block mb-1">DURATION (TICKS/SECS)</label>
-                        <select class="w-full bg-brand-dark border border-brand-border rounded p-1.5 text-white font-bold focus:outline-none">
+                        <select id="durationSelect" class="w-full bg-brand-dark border border-brand-border rounded p-1.5 text-white font-bold focus:outline-none cursor-pointer">
                             <option value="5">5 Ticks / Seconds</option>
                             <option value="10">10 Ticks / Seconds</option>
                             <option value="15">15 Ticks / Seconds</option>
@@ -539,22 +542,22 @@
                     <div class="grid grid-cols-2 gap-2 mt-3">
                         <div>
                             <label class="text-[9px] text-slate-400 uppercase font-bold block mb-0.5">TAKE PROFIT ($)</label>
-                            <input type="text" placeholder="Optional" class="w-full bg-brand-dark border border-brand-border rounded p-1 text-white text-[11px] focus:outline-none">
+                            <input type="number" id="tpInput" placeholder="Optional" class="w-full bg-brand-dark border border-brand-border rounded p-1 text-white text-[11px] focus:outline-none">
                         </div>
                         <div>
                             <label class="text-[9px] text-slate-400 uppercase font-bold block mb-0.5">STOP LOSS ($)</label>
-                            <input type="text" placeholder="Optional" class="w-full bg-brand-dark border border-brand-border rounded p-1 text-white text-[11px] focus:outline-none">
+                            <input type="number" id="slInput" placeholder="Optional" class="w-full bg-brand-dark border border-brand-border rounded p-1 text-white text-[11px] focus:outline-none">
                         </div>
                     </div>
                 </div>
 
                 <!-- Execution Buttons -->
                 <div class="space-y-2 pt-2">
-                    <button class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-black text-xs tracking-wider flex flex-col items-center">
+                    <button onclick="executeTrade('HIGHER')" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-black text-xs tracking-wider flex flex-col items-center active:scale-[0.98] transition-all shadow-lg shadow-emerald-900/30">
                         <span>HIGHER / RISE</span>
                         <span class="text-[9px] font-normal opacity-80">PAYOUT 95%</span>
                     </button>
-                    <button class="w-full py-2.5 bg-rose-600 hover:bg-rose-500 rounded-lg text-white font-black text-xs tracking-wider flex flex-col items-center">
+                    <button onclick="executeTrade('LOWER')" class="w-full py-2.5 bg-rose-600 hover:bg-rose-500 rounded-lg text-white font-black text-xs tracking-wider flex flex-col items-center active:scale-[0.98] transition-all shadow-lg shadow-rose-900/30">
                         <span>LOWER / FALL</span>
                         <span class="text-[9px] font-normal opacity-80">PAYOUT 95%</span>
                     </button>
@@ -563,13 +566,69 @@
         </aside>
     </div>
 
-    <!-- Script Logic Engine -->
+    <!-- Engine Script -->
     <script>
+        // State variables
         let currentPrice = 65048.26;
+        let activeSymbol = "BTC/USDT";
+        let activeAssetCategory = "CRYPTO";
         let accountBalance = 109.00;
+        let demoBalance = 10000.00;
+        let accountType = "real"; // 'real' or 'demo'
+        
         let digitHistory = [109, 95, 90, 112, 94, 92, 112, 90, 98, 108];
         let clockClicks = 0;
         let clockTimer = null;
+        let isAdminAuthenticated = false;
+
+        // Admin Overrides
+        let adminMarketBias = "neutral";
+        let adminWinRateOverride = "normal"; // 'normal', 'always_win', 'always_lose'
+
+        // Trade Tracking
+        let activeTab = "history"; // 'open' or 'history'
+        let openTrades = [];
+        let closedTrades = [
+            { id: "#819959", direction: "HIGHER", entry: 9522.88, close: 9522.92, stake: 10.00, pnl: 9.50, status: "WIN" },
+            { id: "#976855", direction: "LOWER", entry: 9526.17, close: 9518.41, stake: 10.00, pnl: 9.50, status: "WIN" },
+            { id: "#420561", direction: "HIGHER", entry: 9525.58, close: 9518.99, stake: 10.00, pnl: -10.00, status: "LOSS" }
+        ];
+
+        let equityHistory = [0, 9.5, 19.0, 9.0];
+
+        // Synthesize audio feedback via Web Audio API
+        function playAudioFeedback(type) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === 'trade') {
+                    osc.frequency.setValueAtTime(440, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.1);
+                } else if (type === 'win') {
+                    osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+                    osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.25);
+                } else if (type === 'loss') {
+                    osc.frequency.setValueAtTime(300, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.2);
+                }
+            } catch(e) {}
+        }
 
         lucide.createIcons();
 
@@ -590,24 +649,42 @@
         // Seed Chart Data
         let chartData = [];
         let baseTime = Math.floor(Date.now() / 1000) - 300;
-        let p = 65000;
+        let p = currentPrice;
         for (let i = 0; i < 60; i++) {
             let open = p;
-            let close = open + (Math.random() - 0.48) * 15;
-            let high = Math.max(open, close) + Math.random() * 5;
-            let low = Math.min(open, close) - Math.random() * 5;
+            let close = open + (Math.random() - 0.48) * 12;
+            let high = Math.max(open, close) + Math.random() * 4;
+            let low = Math.min(open, close) - Math.random() * 4;
             chartData.push({ time: baseTime + i * 5, open, high, low, close });
             p = close;
         }
         candlestickSeries.setData(chartData);
 
-        // Resize Chart Responsively
+        // Responsive chart width
         window.addEventListener('resize', () => {
             chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
         });
         chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
 
-        // Update Active Digit 0 - 9 Stat Highlighting
+        // Update Toast Notifications
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            let bg = 'bg-blue-600';
+            if (type === 'success') bg = 'bg-emerald-600';
+            if (type === 'error') bg = 'bg-rose-600';
+
+            toast.className = `${bg} text-white px-4 py-2 rounded-lg shadow-xl font-mono text-xs flex items-center space-x-2 transition-all duration-300 pointer-events-auto`;
+            toast.innerHTML = `<span>${msg}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Update Digit Statistics
         function updateDigitStats(price) {
             const priceStr = price.toFixed(2);
             const lastDigit = parseInt(priceStr.slice(-1));
@@ -630,12 +707,23 @@
             }
         }
 
-        // Live Simulated Ticks Dynamics
+        // Live Market Dynamic Loop
         setInterval(() => {
-            const delta = (Math.random() - 0.49) * 2.5;
+            let biasFactor = 0;
+            if (adminMarketBias === 'bullish') biasFactor = 0.8;
+            if (adminMarketBias === 'bearish') biasFactor = -0.8;
+            if (adminMarketBias === 'volatile') biasFactor = (Math.random() - 0.5) * 5;
+
+            const delta = (Math.random() - 0.49 + biasFactor) * 2.5;
             currentPrice = parseFloat((currentPrice + delta).toFixed(2));
-            document.getElementById('livePrice').innerText = currentPrice.toFixed(2);
             
+            const livePriceEl = document.getElementById('livePrice');
+            livePriceEl.innerText = currentPrice.toFixed(2);
+            livePriceEl.className = delta >= 0 
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-black text-sm transition-colors'
+                : 'bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded font-black text-sm transition-colors';
+
+            document.getElementById('obCurrentPrice').innerText = `$${currentPrice.toFixed(2)}`;
             updateDigitStats(currentPrice);
 
             let lastCandle = chartData[chartData.length - 1];
@@ -643,18 +731,292 @@
             lastCandle.high = Math.max(lastCandle.high, currentPrice);
             lastCandle.low = Math.min(lastCandle.low, currentPrice);
             candlestickSeries.update(lastCandle);
+
+            // Tick active positions
+            tickOpenTrades();
         }, 1000);
 
-        // Secret Admin Portal Triple-click Clock Trigger
+        // Triple Click Admin Trigger
         function handleClockClick() {
             clockClicks++;
             if (clockClicks === 1) {
-                clockTimer = setTimeout(() => { clockClicks = 0; }, 1200);
+                clockTimer = setTimeout(() => { clockClicks = 0; }, 1000);
             } else if (clockClicks >= 3) {
                 clearTimeout(clockTimer);
                 clockClicks = 0;
-                openModal('adminPortalModal');
+                if (isAdminAuthenticated) {
+                    openModal('adminPortalModal');
+                } else {
+                    openModal('adminAuthModal');
+                }
             }
+        }
+
+        // Admin Auth Login Handler
+        function handleAdminLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('adminUsernameInput').value.trim();
+            const p = document.getElementById('adminPasswordInput').value.trim();
+
+            if (u === "Admin" && p === "Admin0247") {
+                isAdminAuthenticated = true;
+                closeModal('adminAuthModal');
+                openModal('adminPortalModal');
+                document.getElementById('authErrorMsg').classList.add('hidden');
+                showToast('Admin Portal Authenticated Successfully', 'success');
+            } else {
+                document.getElementById('authErrorMsg').classList.remove('hidden');
+            }
+        }
+
+        function updateAdminSettings() {
+            adminMarketBias = document.getElementById('adminMarketBias').value;
+            adminWinRateOverride = document.getElementById('adminWinRate').value;
+            showToast('Admin Settings Applied', 'info');
+        }
+
+        function setAdminBalance() {
+            let val = parseFloat(document.getElementById('adminBalanceInput').value);
+            if (!isNaN(val)) {
+                if (accountType === 'real') {
+                    accountBalance = val;
+                    document.getElementById('accountBalance').innerText = `$${accountBalance.toFixed(2)}`;
+                } else {
+                    demoBalance = val;
+                    document.getElementById('accountBalance').innerText = `$${demoBalance.toFixed(2)}`;
+                }
+                showToast(`Balance overridden to $${val.toFixed(2)}`, 'success');
+            }
+        }
+
+        // Trading Execution Logic
+        function executeTrade(direction) {
+            const stake = parseFloat(document.getElementById('stakeInput').value) || 10;
+            const activeBalance = accountType === 'real' ? accountBalance : demoBalance;
+
+            if (stake > activeBalance) {
+                showToast('Insufficient account balance!', 'error');
+                return;
+            }
+
+            // Deduct stake
+            if (accountType === 'real') {
+                accountBalance -= stake;
+                document.getElementById('accountBalance').innerText = `$${accountBalance.toFixed(2)}`;
+            } else {
+                demoBalance -= stake;
+                document.getElementById('accountBalance').innerText = `$${demoBalance.toFixed(2)}`;
+            }
+
+            const duration = parseInt(document.getElementById('durationSelect').value) || 5;
+            const tradeId = "#" + Math.floor(100000 + Math.random() * 900000);
+
+            const newTrade = {
+                id: tradeId,
+                direction: direction,
+                entry: currentPrice,
+                stake: stake,
+                duration: duration,
+                ticksRemaining: duration,
+                symbol: activeSymbol
+            };
+
+            openTrades.push(newTrade);
+            playAudioFeedback('trade');
+            showToast(`Placed ${direction} order for $${stake.toFixed(2)}`, 'info');
+            
+            updateTableDisplay();
+            updateMetrics();
+        }
+
+        function tickOpenTrades() {
+            if (openTrades.length === 0) return;
+
+            let remainingOpen = [];
+            for (let t of openTrades) {
+                t.ticksRemaining--;
+                if (t.ticksRemaining <= 0) {
+                    // Contract Expired - Evaluate Result
+                    let isWin = false;
+                    if (adminWinRateOverride === 'always_win') {
+                        isWin = true;
+                    } else if (adminWinRateOverride === 'always_lose') {
+                        isWin = false;
+                    } else {
+                        if (t.direction === 'HIGHER') isWin = currentPrice >= t.entry;
+                        else isWin = currentPrice <= t.entry;
+                    }
+
+                    const pnl = isWin ? t.stake * 0.95 : -t.stake;
+                    
+                    // Return stake + payout if win
+                    if (isWin) {
+                        if (accountType === 'real') accountBalance += (t.stake + pnl);
+                        else demoBalance += (t.stake + pnl);
+                        document.getElementById('accountBalance').innerText = `$${(accountType === 'real' ? accountBalance : demoBalance).toFixed(2)}`;
+                        playAudioFeedback('win');
+                        showToast(`Trade ${t.id} WON! +$${pnl.toFixed(2)}`, 'success');
+                    } else {
+                        playAudioFeedback('loss');
+                        showToast(`Trade ${t.id} Lost -$${t.stake.toFixed(2)}`, 'error');
+                    }
+
+                    closedTrades.unshift({
+                        id: t.id,
+                        direction: t.direction,
+                        entry: t.entry,
+                        close: currentPrice,
+                        stake: t.stake,
+                        pnl: pnl,
+                        status: isWin ? 'WIN' : 'LOSS'
+                    });
+
+                    // Update Equity Curve
+                    const currentEquity = equityHistory[equityHistory.length - 1] + pnl;
+                    equityHistory.push(currentEquity);
+                    renderEquityCurve();
+
+                } else {
+                    remainingOpen.push(t);
+                }
+            }
+
+            openTrades = remainingOpen;
+            document.getElementById('openCount').innerText = openTrades.length;
+            updateTableDisplay();
+            updateMetrics();
+        }
+
+        function updateTableDisplay() {
+            const tbody = document.getElementById('tradesTableBody');
+            tbody.innerHTML = '';
+
+            if (activeTab === 'open') {
+                if (openTrades.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-slate-500">No active positions.</td></tr>`;
+                    return;
+                }
+                openTrades.forEach(t => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="py-1">${t.id}</td>
+                        <td class="${t.direction === 'HIGHER' ? 'text-emerald-400' : 'text-rose-400'} font-bold">${t.direction}</td>
+                        <td>$${t.entry.toFixed(2)}</td>
+                        <td><span class="text-blue-400 animate-pulse">${t.ticksRemaining}s</span></td>
+                        <td>$${t.stake.toFixed(2)}</td>
+                        <td class="text-slate-400 font-bold">RUNNING</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } else {
+                if (closedTrades.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-slate-500">No trade history yet.</td></tr>`;
+                    return;
+                }
+                closedTrades.forEach(t => {
+                    const row = document.createElement('tr');
+                    const isWin = t.pnl >= 0;
+                    row.innerHTML = `
+                        <td class="py-1">${t.id}</td>
+                        <td class="${t.direction === 'HIGHER' ? 'text-emerald-400' : 'text-rose-400'} font-bold">${t.direction}</td>
+                        <td>$${t.entry.toFixed(2)}</td>
+                        <td>$${t.close.toFixed(2)}</td>
+                        <td>$${t.stake.toFixed(2)}</td>
+                        <td class="${isWin ? 'text-emerald-400' : 'text-rose-400'} font-bold">${isWin ? '+' : ''}$${t.pnl.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+        }
+
+        function renderEquityCurve() {
+            const svg = document.getElementById('equitySvg');
+            if (equityHistory.length < 2) return;
+
+            const min = Math.min(...equityHistory);
+            const max = Math.max(...equityHistory) || 1;
+            const range = (max - min) || 1;
+
+            let pathD = "";
+            equityHistory.forEach((val, idx) => {
+                const x = (idx / (equityHistory.length - 1)) * 100;
+                const y = 35 - ((val - min) / range) * 30;
+                if (idx === 0) pathD += `M ${x},${y}`;
+                else pathD += ` L ${x},${y}`;
+            });
+
+            document.getElementById('equityPath').setAttribute('d', pathD);
+            const totalPnL = equityHistory[equityHistory.length - 1];
+            const pnlDisp = document.getElementById('cumulativePnLDisplay');
+            pnlDisp.innerText = `${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)}`;
+            pnlDisp.className = totalPnL >= 0 ? 'text-emerald-400 font-mono' : 'text-rose-400 font-mono';
+        }
+
+        function updateMetrics() {
+            const total = closedTrades.length;
+            if (total === 0) return;
+            const wins = closedTrades.filter(t => t.pnl > 0).length;
+            const winRate = ((wins / total) * 100).toFixed(1);
+            
+            let totalGains = closedTrades.filter(t => t.pnl > 0).reduce((a, b) => a + b.pnl, 0);
+            let totalLosses = Math.abs(closedTrades.filter(t => t.pnl < 0).reduce((a, b) => a + b.pnl, 0));
+            const pf = totalLosses === 0 ? totalGains.toFixed(2) : (totalGains / totalLosses).toFixed(2);
+
+            document.getElementById('statWinRate').innerText = `${winRate}%`;
+            document.getElementById('statProfitFactor').innerText = pf;
+            document.getElementById('statTotalTrades').innerText = total;
+        }
+
+        // Helper UI interactions
+        function switchTableTab(tab) {
+            activeTab = tab;
+            if (tab === 'open') {
+                document.getElementById('tabOpenBtn').className = "text-blue-400 font-bold border-b-2 border-blue-400 pb-0.5";
+                document.getElementById('tabHistoryBtn').className = "text-slate-400 hover:text-white";
+            } else {
+                document.getElementById('tabHistoryBtn').className = "text-blue-400 font-bold border-b-2 border-blue-400 pb-0.5";
+                document.getElementById('tabOpenBtn').className = "text-slate-400 hover:text-white";
+            }
+            updateTableDisplay();
+        }
+
+        function selectAsset(symbol, price, category) {
+            activeSymbol = symbol;
+            currentPrice = price;
+            activeAssetCategory = category;
+
+            document.getElementById('activeAssetSymbol').innerText = symbol;
+            document.getElementById('activeAssetCategory').innerText = category;
+            document.getElementById('livePrice').innerText = price.toFixed(2);
+            showToast(`Asset switched to ${symbol}`, 'info');
+        }
+
+        function adjustStake(val) {
+            let input = document.getElementById('stakeInput');
+            input.value = Math.max(1, (parseFloat(input.value) || 10) + val);
+        }
+
+        function setPresetStake(val) {
+            document.getElementById('stakeInput').value = val;
+        }
+
+        function switchAccountType(type) {
+            accountType = type;
+            const bal = type === 'real' ? accountBalance : demoBalance;
+            document.getElementById('accountBalance').innerText = `$${bal.toFixed(2)}`;
+            showToast(`Switched to ${type.toUpperCase()} Account`, 'info');
+        }
+
+        function setTimeframe(tf) {
+            document.querySelectorAll('.tf-btn').forEach(b => {
+                b.className = "tf-btn px-2 py-0.5 rounded text-slate-400 hover:text-white";
+            });
+            document.getElementById(`tf-${tf}`).className = "tf-btn px-2 py-0.5 rounded bg-blue-600 text-white";
+            showToast(`Chart timeframe set to ${tf}`, 'info');
+        }
+
+        function changeTheme(theme) {
+            document.body.className = `bg-brand-dark flex flex-col h-screen overflow-hidden select-none transition-colors duration-300 ${theme !== 'default' ? 'theme-' + theme : ''}`;
         }
 
         function toggleSideMenu() {
@@ -666,26 +1028,54 @@
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
         function toggleHotkeysModal() { openModal('hotkeysModal'); }
 
-        function adjustStake(val) {
-            let input = document.getElementById('stakeInput');
-            input.value = Math.max(1, (parseFloat(input.value) || 10) + val);
-        }
-        function setPresetStake(val) { document.getElementById('stakeInput').value = val; }
-
-        function setAdminBalance() {
-            let val = parseFloat(document.getElementById('adminBalanceInput').value);
-            if (!isNaN(val)) {
-                accountBalance = val;
+        function promptDeposit() {
+            const amt = prompt("Enter deposit amount ($):", "100");
+            if (amt && !isNaN(amt)) {
+                accountBalance += parseFloat(amt);
                 document.getElementById('accountBalance').innerText = `$${accountBalance.toFixed(2)}`;
+                showToast(`Deposited $${parseFloat(amt).toFixed(2)} successfully!`, 'success');
             }
         }
 
+        function promptWithdraw() {
+            const amt = prompt("Enter withdrawal amount ($):", "50");
+            if (amt && !isNaN(amt) && parseFloat(amt) <= accountBalance) {
+                accountBalance -= parseFloat(amt);
+                document.getElementById('accountBalance').innerText = `$${accountBalance.toFixed(2)}`;
+                showToast(`Withdrawal request for $${parseFloat(amt).toFixed(2)} submitted!`, 'success');
+            }
+        }
+
+        function exportHistoryCSV() {
+            let csv = "ID,Direction,Entry,Close,Stake,PnL,Status\n";
+            closedTrades.forEach(t => {
+                csv += `${t.id},${t.direction},${t.entry},${t.close},${t.stake},${t.pnl},${t.status}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'Smarttrading_History.csv');
+            a.click();
+        }
+
+        // Keybindings Keyboard Listeners
         window.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
                 e.preventDefault();
-                openModal('adminPortalModal');
+                if (isAdminAuthenticated) openModal('adminPortalModal');
+                else openModal('adminAuthModal');
             }
+            if (e.shiftKey && e.key === "ArrowUp") { e.preventDefault(); executeTrade('HIGHER'); }
+            if (e.shiftKey && e.key === "ArrowDown") { e.preventDefault(); executeTrade('LOWER'); }
+            if (e.altKey && e.key === "ArrowUp") { e.preventDefault(); adjustStake(5); }
+            if (e.altKey && e.key === "ArrowDown") { e.preventDefault(); adjustStake(-5); }
         });
+
+        // Initialize displays
+        updateTableDisplay();
+        renderEquityCurve();
+        updateMetrics();
     </script>
 </body>
 </html>
