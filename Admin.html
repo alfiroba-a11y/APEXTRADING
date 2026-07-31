@@ -3,103 +3,284 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smarttrading Admin Panel</title>
+  <title>Smarttrading - Elite Admin Portal</title>
+  <script src="/socket.io/socket.io.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
-    body { background-color: #090d16; color: #e2e8f0; padding: 16px; }
-    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 12px; margin-bottom: 20px; }
-    h1 { font-size: 18px; color: #3b82f6; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-    .card { background: #131b2e; border: 1px solid #1e293b; border-radius: 8px; padding: 16px; }
-    .group { display: flex; flex-direction: column; margin-bottom: 12px; }
-    label { font-size: 12px; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase; }
-    input, select { background: #0b1120; border: 1px solid #334155; color: #fff; padding: 10px; border-radius: 6px; width: 100%; outline: none; }
-    button { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
-    .btn-blue { background: #2563eb; color: #fff; }
-    .btn-red { background: #dc2626; color: #fff; margin-top: 6px; }
+    :root {
+      --bg-dark: #090d16;
+      --card-dark: #121824;
+      --border-dark: #1e293b;
+      --text-main: #f1f5f9;
+      --text-muted: #64748b;
+      --accent-blue: #3b82f6;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-dark); color: var(--text-main); padding: 20px; }
+
+    /* Top Bar with Clock Trigger */
+    header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: var(--card-dark); border: 1px solid var(--border-dark); border-radius: 12px; margin-bottom: 24px; }
+    .brand { font-size: 1.2rem; font-weight: 800; color: var(--accent-blue); letter-spacing: 0.5px; }
+    
+    .clock-badge { font-family: monospace; font-size: 0.95rem; background: #000; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-dark); color: var(--text-muted); cursor: pointer; user-select: none; }
+    .clock-badge:hover { border-color: var(--accent-blue); color: var(--text-main); }
+    .status-dot { color: var(--accent-green); font-size: 0.8rem; margin-left: 8px; }
+
+    /* Panel Layout */
+    .admin-container { max-width: 1200px; margin: 0 auto; display: none; }
+    .admin-card { background: var(--card-dark); border: 1px solid var(--border-dark); border-radius: 12px; padding: 24px; }
+
+    /* Tab Navigation */
+    .tabs { display: flex; gap: 12px; margin-bottom: 24px; border-bottom: 1px solid var(--border-dark); padding-bottom: 12px; }
+    .tab-btn { padding: 10px 20px; background: transparent; border: 1px solid var(--border-dark); color: var(--text-muted); border-radius: 8px; font-weight: 600; cursor: pointer; }
+    .tab-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.9rem; }
+    th, td { border: 1px solid var(--border-dark); padding: 12px; text-align: left; }
+    th { background: #000; color: var(--text-muted); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; }
+    tr:nth-child(even) { background: rgba(255,255,255,0.01); }
+
+    /* Buttons & Badges */
+    .btn { padding: 6px 12px; border-radius: 6px; border: none; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
+    .btn-blue { background: var(--accent-blue); color: #fff; }
+    .btn-green { background: var(--accent-green); color: #fff; }
+    
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+    .badge-PENDING { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+    .badge-PROMPTED { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+    .badge-COMPLETED { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+
+    /* Auth Prompt Overlay */
+    .auth-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 999; }
+    .auth-box { background: var(--card-dark); border: 1px solid var(--border-dark); padding: 32px; border-radius: 12px; width: 100%; max-width: 360px; text-align: center; }
+    .auth-box input { width: 100%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid var(--border-dark); border-radius: 6px; color: #fff; outline: none; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>SMARTTRADING CONTROL CENTER</h1>
+    <div class="brand">🛡️ SMARTTRADING ADMIN</div>
+    <!-- Triple click on clock to trigger admin authentication -->
+    <div id="adminClockTrigger" class="clock-badge" title="Triple-click to authenticate">
+      <span id="liveClock">2026-07-31 00:00:00 GMT</span>
+      <span class="status-dot">●</span>
+    </div>
   </header>
 
-  <div class="grid">
-    <div class="card">
-      <div class="group">
-        <label>Even / Odd Payout (%)</label>
-        <input type="number" id="evenOddPayout" value="95.2" step="0.1">
-      </div>
-      <div class="group">
-        <label>Maintenance Mode</label>
-        <select id="maintenanceMode">
-          <option value="false">Active</option>
-          <option value="true">Locked</option>
-        </select>
-      </div>
-      <button class="btn-blue" onclick="updateGlobalConfig()">Save Config</button>
+  <!-- Login Overlay -->
+  <div id="authOverlay" class="auth-overlay">
+    <div class="auth-box">
+      <h3>Elite Admin Portal</h3>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 6px;">Authenticate to continue</p>
+      <form onsubmit="handleAdminAuth(event)" style="margin-top: 20px;">
+        <input type="text" id="adminUser" placeholder="Username" required>
+        <input type="password" id="adminPass" placeholder="Password" required>
+        <button type="submit" class="btn btn-blue" style="width: 100%; padding: 12px; margin-top: 10px;">Login</button>
+      </form>
     </div>
+  </div>
 
-    <div class="card">
-      <div class="group">
-        <label>Target User ID</label>
-        <input type="text" id="targetUserId" placeholder="MongoDB User ID">
+  <!-- Main Admin Interface -->
+  <div id="adminPanel" class="admin-container">
+    <div class="admin-card">
+      <div class="tabs">
+        <button id="btnTabUsers" class="tab-btn active" onclick="switchTab('users')">Registered Users (Gmails)</button>
+        <button id="btnTabTx" class="tab-btn" onclick="switchTab('transactions')">M-Pesa Payment Requests</button>
       </div>
-      <div class="group">
-        <label>Override Mode</label>
-        <select id="forceOutcome">
-          <option value="NORMAL">Normal Market</option>
-          <option value="WIN">Force WIN</option>
-          <option value="LOSS">Force LOSS</option>
-        </select>
+
+      <!-- Tab 1: User Accounts -->
+      <div id="tabUsersSection">
+        <h3>User Account Control & Trade Manipulation</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Gmail Account</th>
+              <th>Live Balance ($)</th>
+              <th>Demo Balance ($)</th>
+              <th>Forced Outcome</th>
+              <th>Forced Digit</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="usersTableBody"></tbody>
+        </table>
       </div>
-      <div class="group">
-        <label>Force Next Digit (0-9)</label>
-        <input type="number" id="forcedNextDigit" min="0" max="9" placeholder="Random">
+
+      <!-- Tab 2: M-Pesa Requests -->
+      <div id="tabTxSection" style="display: none;">
+        <h3>M-Pesa Requests (Deposits & Cash Outs)</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>User Gmail</th>
+              <th>Type</th>
+              <th>Amount (KES)</th>
+              <th>M-Pesa Phone</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="txTableBody"></tbody>
+        </table>
       </div>
-      <button class="btn-red" onclick="applyUserOverride()">Apply Override</button>
     </div>
   </div>
 
   <script>
-    const ADMIN_KEY = 'SECRET_ADMIN_KEY_123';
-    const API_BASE = '/api/admin';
+    const socket = io();
 
-    async function apiRequest(endpoint, payload) {
-      try {
-        const res = await fetch(`${API_BASE}${endpoint}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-key': ADMIN_KEY
-          },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (data.success) {
-          alert('Success!');
-        } else {
-          alert('Error: ' + (data.error || data.message));
-        }
-      } catch (err) {
-        alert('Server Connection Failed: ' + err.message);
+    // Live Clock Display
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('liveClock').innerText = now.toISOString().replace('T', ' ').substring(0, 19) + ' GMT';
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Triple Click Trigger on Clock
+    let clickCount = 0;
+    let clickTimer;
+    document.getElementById('adminClockTrigger').addEventListener('click', () => {
+      clickCount++;
+      clearTimeout(clickTimer);
+      if (clickCount === 3) {
+        clickCount = 0;
+        document.getElementById('authOverlay').style.display = 'flex';
+      } else {
+        clickTimer = setTimeout(() => { clickCount = 0; }, 600);
+      }
+    });
+
+    // Admin Authentication Handlers
+    function getAdminHeaders() {
+      return {
+        'adminuser': sessionStorage.getItem('admin_user') || '',
+        'adminpass': sessionStorage.getItem('admin_pass') || '',
+        'Content-Type': 'application/json'
+      };
+    }
+
+    async function handleAdminAuth(e) {
+      e.preventDefault();
+      const user = document.getElementById('adminUser').value;
+      const pass = document.getElementById('adminPass').value;
+
+      if (user === 'Admin' && pass === 'Admin0247') {
+        sessionStorage.setItem('admin_user', user);
+        sessionStorage.setItem('admin_pass', pass);
+        document.getElementById('authOverlay').style.display = 'none';
+        document.getElementById('adminPanel').style.display = 'block';
+        loadAdminData();
+      } else {
+        alert('Access Denied: Invalid Credentials');
       }
     }
 
-    function updateGlobalConfig() {
-      const evenOddPayout = parseFloat(document.getElementById('evenOddPayout').value);
-      const maintenanceMode = document.getElementById('maintenanceMode').value === 'true';
-      apiRequest('/global-config', { evenOddPayout, maintenanceMode });
+    // Auto-login if session exists
+    if (sessionStorage.getItem('admin_user') === 'Admin' && sessionStorage.getItem('admin_pass') === 'Admin0247') {
+      document.getElementById('authOverlay').style.display = 'none';
+      document.getElementById('adminPanel').style.display = 'block';
+      loadAdminData();
     }
 
-    function applyUserOverride() {
-      const userId = document.getElementById('targetUserId').value;
-      const forceOutcome = document.getElementById('forceOutcome').value;
-      const forcedNextDigit = document.getElementById('forcedNextDigit').value;
-      if (!userId) return alert('Enter User ID');
-      apiRequest('/manipulate-user', { userId, forceOutcome, forcedNextDigit });
+    // Fetch and Populate Admin Tables
+    async function loadAdminData() {
+      const headers = getAdminHeaders();
+
+      // Load Users
+      const resUsers = await fetch('/api/admin/users', { headers });
+      const dataUsers = await resUsers.json();
+      if (dataUsers.success) {
+        document.getElementById('usersTableBody').innerHTML = dataUsers.users.map(u => `
+          <tr>
+            <td><b>${u.email}</b></td>
+            <td>$${u.liveBalance.toFixed(2)}</td>
+            <td>$${u.demoBalance.toFixed(2)}</td>
+            <td>${u.adminControls?.forceOutcome || 'NORMAL'}</td>
+            <td>${u.adminControls?.forcedNextDigit ?? 'Auto'}</td>
+            <td>
+              <button onclick="editUserPrompt('${u._id}', ${u.liveBalance}, ${u.demoBalance})" class="btn btn-blue">Control</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      // Load M-Pesa Requests
+      const resTx = await fetch('/api/admin/transactions', { headers });
+      const dataTx = await resTx.json();
+      if (dataTx.success) {
+        document.getElementById('txTableBody').innerHTML = dataTx.transactions.map(t => `
+          <tr>
+            <td>${t.userEmail}</td>
+            <td><b style="color:${t.type === 'DEPOSIT' ? 'var(--accent-green)' : 'var(--accent-red)'}">${t.type}</b></td>
+            <td>KES ${t.amount}</td>
+            <td>${t.phoneNumber}</td>
+            <td><span class="badge badge-${t.status}">${t.status}</span></td>
+            <td>
+              ${t.status === 'PENDING' ? `<button onclick="promptMpesa('${t._id}')" class="btn btn-blue">Send Prompt</button>` : ''}
+              ${t.status === 'PROMPTED' || t.status === 'PENDING' ? `<button onclick="approveMpesa('${t._id}')" class="btn btn-green">Mark Received / Approve</button>` : ''}
+              ${t.status === 'COMPLETED' ? '✔️ Settled' : ''}
+            </td>
+          </tr>
+        `).join('');
+      }
     }
+
+    // Admin Controls
+    async function promptMpesa(transactionId) {
+      await fetch('/api/admin/transaction/prompt', {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({ transactionId })
+      });
+      loadAdminData();
+    }
+
+    async function approveMpesa(transactionId) {
+      const res = await fetch('/api/admin/transaction/approve', {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({ transactionId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Transaction marked as completed. User live balance updated!');
+        loadAdminData();
+      }
+    }
+
+    async function editUserPrompt(userId, liveBal, demoBal) {
+      const newLive = prompt("Set Live Balance ($):", liveBal);
+      if (newLive === null) return;
+      const outcome = prompt("Force Trade Outcome (NORMAL, WIN, LOSS):", "NORMAL");
+
+      await fetch('/api/admin/user/update', {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({
+          userId,
+          liveBalance: Number(newLive),
+          demoBalance: demoBal,
+          forceOutcome: outcome ? outcome.toUpperCase() : "NORMAL"
+        })
+      });
+      loadAdminData();
+    }
+
+    // Tab Switching
+    function switchTab(tab) {
+      document.getElementById('tabUsersSection').style.display = tab === 'users' ? 'block' : 'none';
+      document.getElementById('tabTxSection').style.display = tab === 'transactions' ? 'block' : 'none';
+      document.getElementById('btnTabUsers').classList.toggle('active', tab === 'users');
+      document.getElementById('btnTabTx').classList.toggle('active', tab === 'transactions');
+    }
+
+    // Real-time Updates via Sockets
+    socket.on('NEW_TRANSACTION_REQUEST', () => loadAdminData());
   </script>
 </body>
 </html>
