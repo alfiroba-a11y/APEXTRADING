@@ -13,12 +13,12 @@ const io = new Server(server, { cors: { origin: '*' } });
 app.use(express.json());
 app.use(cors());
 
-// Serve static assets from the /public folder
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static assets directly from the root folder
+app.use(express.static(__dirname));
 
 // Explicit Route for Main Dashboard
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Database Schemas
@@ -109,7 +109,7 @@ io.on('connection', (socket) => {
 
 // Fallback for SPA Routing
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Server Initialization
