@@ -1,44 +1,81 @@
-const mongoose = require('mongoose');
-
 /**
- * User
- * IMPORTANT: This platform is a paper-trading demo. There is no `liveBalance`,
- * no real money field, and no admin-forced outcome field on purpose. If you
- * are adapting this for a real product, real balances must come from a
- * licensed payment processor's ledger, never from a field a client (or an
- * admin panel) can edit directly.
+ * Synthetic price engine.
+ *
+ * Every symbol follows an independent mean-reverting random walk on the
+ * server. There is deliberately no "bias" or "admin override" input to this
+ * module — the whole point of the earlier version's admin panel was that it
+ * could secretly tilt these numbers against users. Trade results are always
+ * computed by comparing the real entryPrice to the real price at expiry, both
+ * read from here.
  */
-const userSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  passwordHash: { type: String, required: true },
-  demoBalance: { type: Number, default: 10000 },
-  isFrozen: { type: Boolean, default: false }, // account-level suspension only (e.g. abuse), not a trade-rigging tool
-  createdAt: { type: Date, default: Date.now }
-});
 
-/**
- * Trade
- * Outcome is ALWAYS computed from entryPrice vs closePrice, which come from
- * the server-side price engine (server/priceEngine.js). There is no
- * "forceOutcome" field anywhere in this schema, and nothing in the resolver
- * reads a value that an admin or client could set to predetermine a result.
- */
-const tradeSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  symbol: { type: String, required: true },
-  direction: { type: String, enum: ['HIGHER', 'LOWER'], required: true },
-  stake: { type: Number, required: true },
-  payoutPct: { type: Number, required: true }, // e.g. 0.95 = 95% payout on win
-  entryPrice: { type: Number, required: true },
-  closePrice: { type: Number, default: null },
-  durationSec: { type: Number, required: true },
-  openedAt: { type: Date, default: Date.now },
-  resolvesAt: { type: Date, required: true },
-  status: { type: String, enum: ['OPEN', 'WON', 'LOST'], default: 'OPEN', index: true },
-  pnl: { type: Number, default: 0 }
-});
+const SYMBOLS = {
+  'Vol 50 (1s)':        { price: 680.12,   vol: 0.35, category: 'SYNTHETIC' },
+  'Vol 75 (1s)':        { price: 3410.85,  vol: 0.6,  category: 'SYNTHETIC' },
+  'Vol 100 (1s)':       { price: 12540.90, vol: 1.1,  category: 'SYNTHETIC' },
+  'BTC/USD':            { price: 65048.26, vol: 0.05, category: 'CRYPTO' },
+  'ETH/USD':            { price: 3450.50,  vol: 0.06, category: 'CRYPTO' },
+  'EUR/USD':            { price: 1.08500,  vol: 0.0004, category: 'FOREX' },
+  'GBP/USD':            { price: 1.29200,  vol: 0.0004, category: 'FOREX' },
+  'Gold (XAU/USD)':     { price: 2380.40,  vol: 0.03, category: 'COMMODITY' }
+};
 
-const User = mongoose.model('User', userSchema);
-const Trade = mongoose.model('Trade', tradeSchema);
+// Internal mutable state
+const state = {};
+for (const [symbol, cfg] of Object.entries(SYMBOLS)) {
+  state[symbol] = {
+    price: cfg.price,
+    base: cfg.price,
+    vol: cfg.vol,
+    category: cfg.category,
+    digitHistory: new Array(10).fill(0)
+  };
+}
 
-module.exports = { User, Trade };
+function stepPrice(s) {
+  // Mean-reverting random walk: pulls gently back toward `base` so prices
+  // don't drift to absurd values over a long-running demo session, but the
+  // step itself is symmetric random noise - nobody's thumb is on the scale.
+  const meanReversion = (s.base - s.price) * 0.001;
+  const noise = (Math.random() - 0.5) * s.vol * (s.price * 0.001 + 1);
+  s.price = Math.max(0.0001, s.price + meanReversion + noise);
+  return s.price;
+}
+
+function tickAll() {
+  const updates = {};
+  for (const [symbol, s] of Object.entries(state)) {
+    const price = stepPrice(s);
+    const decimals = price < 10 ? 5 : 2;
+    const rounded = parseFloat(price.toFixed(decimals));
+    s.price = rounded;
+
+    const lastDigit = parseInt(rounded.toFixed(decimals).replace('.', '').slice(-1), 10);
+    s.digitHistory[lastDigit]++;
+
+    updates[symbol] = { price: rounded, category: s.category, lastDigit };
+  }
+  return updates;
+}
+
+function getPrice(symbol) {
+  const s = state[symbol];
+  return s ? s.price : null;
+}
+
+function getDigitStats(symbol) {
+  const s = state[symbol];
+  if (!s) return null;
+  const total = s.digitHistory.reduce((a, b) => a + b, 0) || 1;
+  return s.digitHistory.map(count => parseFloat(((count / total) * 100).toFixed(1)));
+}
+
+function listSymbols() {
+  return Object.entries(state).map(([symbol, s]) => ({
+    symbol,
+    price: s.price,
+    category: s.category
+  }));
+}
+
+module.exports = { tickAll, getPrice, getDigitStats, listSymbols, SYMBOLS };
